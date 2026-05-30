@@ -11,6 +11,14 @@
     <meta name="theme-color" content="#7c3aed" />
   </head>
   <body>
+    <script>
+      // Apply theme before paint to avoid a white flash at night
+      (function () {
+        var t = localStorage.getItem('theme') || 'system';
+        var dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) document.documentElement.classList.add('dark');
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

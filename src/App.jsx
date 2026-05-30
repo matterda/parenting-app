@@ -77,20 +77,20 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-violet-600 px-4 pt-safe pb-3 shadow-md">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
+      <header className="bg-violet-600 dark:bg-violet-800 px-4 pt-safe pb-3 shadow-md">
         <h1 className="text-lg font-bold text-white tracking-tight">Baby Log</h1>
       </header>
 
-      <nav className="flex border-b border-gray-200 bg-white">
+      <nav className="flex border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
         {TABS.map(t => (
           <button
             key={t}
             onClick={() => { if (phase === 'idle') setTab(t) }}
             className={`flex-1 py-3 text-sm font-medium transition ${
               tab === t
-                ? 'border-b-2 border-violet-600 text-violet-600'
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'border-b-2 border-violet-600 text-violet-600 dark:text-violet-400'
+                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
             } ${phase !== 'idle' ? 'opacity-40 cursor-default' : ''}`}
           >
             {t}
@@ -104,7 +104,7 @@ export default function App() {
         {phase === 'extracting' && (
           <div className="flex flex-col items-center justify-center gap-4 py-16">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-600 border-t-transparent" />
-            <p className="text-sm text-gray-500">Extracting events…</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Extracting events…</p>
           </div>
         )}
 
@@ -119,7 +119,7 @@ export default function App() {
 
         {phase === 'error' && (
           <div className="flex flex-col gap-4">
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950 p-4 text-sm text-red-700 dark:text-red-300">
               <strong>Extraction failed:</strong> {errorMsg}
               <br />Your note was saved as raw text.
             </div>
@@ -134,7 +134,7 @@ export default function App() {
 
         {phase === 'idle' && tab === 'Log' && (
           <section className="flex flex-col gap-4">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               Describe what happened in plain language. Tap the mic on your keyboard to dictate.
             </p>
             <LogInput onAdd={handleAdd} />

@@ -21,7 +21,7 @@ export default function EchoLoop({ events, adviceRequested, onConfirm, onReject 
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-gray-500 dark:text-gray-400">
         Here's what I logged — tap any amber field to correct it.
       </p>
 
@@ -34,7 +34,7 @@ export default function EchoLoop({ events, adviceRequested, onConfirm, onReject 
       ))}
 
       {adviceRequested && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950 p-4 text-sm text-amber-800 dark:text-amber-300">
           <strong>Note:</strong> I can't assess health questions — but I've saved it for
           your pediatrician. You'll find it in the report.
         </div>
@@ -49,7 +49,7 @@ export default function EchoLoop({ events, adviceRequested, onConfirm, onReject 
         </button>
         <button
           onClick={onReject}
-          className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition"
+          className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
         >
           Fix note
         </button>
@@ -65,13 +65,13 @@ function EventCard({ event, onFieldChange }) {
   const confirmableFields = getConfirmableFields(event)
 
   return (
-    <div className={`rounded-xl border bg-white p-4 shadow-sm ${
-      event.confidence === 'low' ? 'border-amber-300' : 'border-gray-100'
+    <div className={`rounded-xl border bg-white dark:bg-gray-900 p-4 shadow-sm ${
+      event.confidence === 'low' ? 'border-amber-300 dark:border-amber-700' : 'border-gray-100 dark:border-gray-800'
     }`}>
-      <p className="font-medium text-gray-800 text-sm">{eventToText(event)}</p>
+      <p className="font-medium text-gray-800 dark:text-gray-100 text-sm">{eventToText(event)}</p>
 
       {event.context_note && (
-        <p className="mt-1 text-xs text-gray-400 italic">"{event.context_note}"</p>
+        <p className="mt-1 text-xs text-gray-400 dark:text-gray-500 italic">"{event.context_note}"</p>
       )}
 
       {confirmableFields.length > 0 && (
@@ -106,7 +106,7 @@ function FieldChip({ field, label, value, needsConfirm, onChange }) {
       <div className="flex items-center gap-1">
         <input
           autoFocus
-          className="rounded-lg border border-violet-400 px-2 py-1 text-xs w-28 focus:outline-none focus:ring-2 focus:ring-violet-400"
+          className="rounded-lg border border-violet-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-2 py-1 text-xs w-28 focus:outline-none focus:ring-2 focus:ring-violet-400"
           value={draft}
           onChange={e => setDraft(e.target.value)}
           onBlur={commit}
@@ -121,8 +121,8 @@ function FieldChip({ field, label, value, needsConfirm, onChange }) {
       onClick={() => setEditing(true)}
       className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
         needsConfirm
-          ? 'bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200'
-          : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+          ? 'bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700 dark:hover:bg-amber-900/60'
+          : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
       }`}
     >
       {label}: {displayValue(field, value)}

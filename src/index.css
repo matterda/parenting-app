@@ -6,3 +6,6 @@
 body {
   overscroll-behavior-y: contain;
 }
+
+html { background: #f9fafb; }
+html.dark { background: #030712; }

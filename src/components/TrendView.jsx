@@ -5,7 +5,7 @@ export default function TrendView({ events }) {
   const hasData = events.some(e => e.extracted)
   if (!hasData) {
     return (
-      <p className="text-center text-sm text-gray-400 py-8">
+      <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-8">
         No extracted events yet — log a few and they'll show up here.
       </p>
     )
@@ -21,7 +21,7 @@ export default function TrendView({ events }) {
     <div className="flex flex-col gap-6">
       {/* Today at a glance */}
       <section>
-        <h2 className="text-sm font-semibold text-gray-700 mb-2">Today at a glance</h2>
+        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Today at a glance</h2>
         <div className="grid grid-cols-3 gap-2">
           <StatCard label="Feeds" value={counts.feed} />
           <StatCard label="Sleeps" value={counts.sleep} />
@@ -36,7 +36,7 @@ export default function TrendView({ events }) {
 
       {/* 7-day bars */}
       <section className="flex flex-col gap-5">
-        <h2 className="text-sm font-semibold text-gray-700">Last 7 days</h2>
+        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Last 7 days</h2>
         <BarRow title="Feeds / day" series={series} field="feeds" color="bg-blue-400" />
         <BarRow title="Total sleep (hrs)" series={series} field="sleepHours" color="bg-indigo-400" />
         <BarRow title="Diapers / day" series={series} field="diapers" color="bg-yellow-400" />
@@ -47,9 +47,9 @@ export default function TrendView({ events }) {
 
 function StatCard({ label, value }) {
   return (
-    <div className="rounded-xl border border-gray-100 bg-white p-3 text-center shadow-sm">
-      <div className="text-2xl font-bold text-gray-800">{value}</div>
-      <div className="text-xs text-gray-400">{label}</div>
+    <div className="rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-3 text-center shadow-sm">
+      <div className="text-2xl font-bold text-gray-800 dark:text-gray-100">{value}</div>
+      <div className="text-xs text-gray-400 dark:text-gray-500">{label}</div>
     </div>
   )
 }
@@ -57,15 +57,15 @@ function StatCard({ label, value }) {
 function LastLine({ label, event }) {
   return (
     <div className="flex items-baseline justify-between text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className="text-gray-800 text-right">
+      <span className="text-gray-500 dark:text-gray-400">{label}</span>
+      <span className="text-gray-800 dark:text-gray-100 text-right">
         {event ? (
           <>
             {eventToText(event).replace(/ · \d.*/, '')}{' '}
-            <span className="text-gray-400">· {relativeTime(event.timestamp_start)}</span>
+            <span className="text-gray-400 dark:text-gray-500">· {relativeTime(event.timestamp_start)}</span>
           </>
         ) : (
-          <span className="text-gray-300">—</span>
+          <span className="text-gray-300 dark:text-gray-600">—</span>
         )}
       </span>
     </div>
@@ -78,7 +78,7 @@ function BarRow({ title, series, field, color }) {
   const max = Math.max(...series.map(d => d[field]), 1)
   return (
     <div>
-      <div className="text-xs text-gray-400 mb-1.5">{title}</div>
+      <div className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">{title}</div>
       <div className="flex items-end gap-2">
         {series.map(d => {
           const val = d[field]
@@ -92,8 +92,8 @@ function BarRow({ title, series, field, color }) {
                   title={`${val}`}
                 />
               </div>
-              <div className="text-[10px] text-gray-500">{val}</div>
-              <div className="text-[10px] text-gray-300">{d.label}</div>
+              <div className="text-[10px] text-gray-500 dark:text-gray-400">{val}</div>
+              <div className="text-[10px] text-gray-300 dark:text-gray-600">{d.label}</div>
             </div>
           )
         })}
