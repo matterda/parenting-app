@@ -9,10 +9,18 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="theme-color" content="#7c3aed" />
-    <script type="module" crossorigin src="/parenting-app/assets/index-mUZ9k92d.js"></script>
-    <link rel="stylesheet" crossorigin href="/parenting-app/assets/index-C10EM8dc.css">
+    <script type="module" crossorigin src="/parenting-app/assets/index-BryMfB-A.js"></script>
+    <link rel="stylesheet" crossorigin href="/parenting-app/assets/index-DcDh1Yvo.css">
   <link rel="manifest" href="/parenting-app/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/parenting-app/registerSW.js"></script></head>
   <body>
+    <script>
+      // Apply theme before paint to avoid a white flash at night
+      (function () {
+        var t = localStorage.getItem('theme') || 'system';
+        var dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) document.documentElement.classList.add('dark');
+      })();
+    </script>
     <div id="root"></div>
   </body>
 </html>
