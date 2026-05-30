@@ -4,9 +4,10 @@ import { extractEvents } from './api'
 import LogInput from './components/LogInput'
 import EventList from './components/EventList'
 import EchoLoop from './components/EchoLoop'
+import TrendView from './components/TrendView'
 import Settings from './components/Settings'
 
-const TABS = ['Log', 'History', 'Settings']
+const TABS = ['Log', 'History', 'Trends', 'Settings']
 
 export default function App() {
   const [tab, setTab] = useState('Log')
@@ -137,6 +138,10 @@ export default function App() {
 
         {phase === 'idle' && tab === 'History' && (
           <EventList events={events} />
+        )}
+
+        {phase === 'idle' && tab === 'Trends' && (
+          <TrendView events={events} />
         )}
 
         {phase === 'idle' && tab === 'Settings' && (
