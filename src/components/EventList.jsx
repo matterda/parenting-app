@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { eventToText } from '../utils/eventToText'
 
 const TYPE_COLORS = {
@@ -12,7 +13,7 @@ const TYPE_COLORS = {
   question_for_pediatrician: 'bg-purple-100 text-purple-700',
 }
 
-export default function EventList({ events }) {
+export default function EventList({ events, onDelete }) {
   if (events.length === 0) {
     return (
       <p className="text-center text-sm text-gray-400 py-8">
@@ -24,11 +25,45 @@ export default function EventList({ events }) {
   return (
     <ul className="flex flex-col gap-3">
       {events.map(ev => (
-        <li key={ev.id} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+        <li key={ev.id} className="relative rounded-xl border border-gray-100 bg-white p-4 pr-12 shadow-sm">
           {ev.extracted ? <ExtractedEntry ev={ev} /> : <RawEntry ev={ev} />}
+          <DeleteButton onConfirm={() => onDelete(ev.id)} />
         </li>
       ))}
     </ul>
+  )
+}
+
+function DeleteButton({ onConfirm }) {
+  const [armed, setArmed] = useState(false)
+
+  if (armed) {
+    return (
+      <div className="absolute top-2 right-2 flex gap-1">
+        <button
+          onClick={onConfirm}
+          className="rounded-md bg-red-500 px-2 py-1 text-xs font-semibold text-white hover:bg-red-600"
+        >
+          Delete
+        </button>
+        <button
+          onClick={() => setArmed(false)}
+          className="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-500 hover:bg-gray-200"
+        >
+          Cancel
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      onClick={() => setArmed(true)}
+      aria-label="Delete entry"
+      className="absolute top-2 right-2 rounded-md px-2 py-1 text-gray-300 hover:text-red-500 hover:bg-red-50 transition"
+    >
+      ✕
+    </button>
   )
 }
 

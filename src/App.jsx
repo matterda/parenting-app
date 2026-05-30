@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { addRawEvent, replaceWithExtracted, getAllEvents } from './db'
+import { addRawEvent, replaceWithExtracted, getAllEvents, deleteEvent } from './db'
 import { extractEvents } from './api'
 import LogInput from './components/LogInput'
 import EventList from './components/EventList'
@@ -64,6 +64,11 @@ export default function App() {
     setPendingId(null)
     setPendingText('')
     setErrorMsg('')
+  }
+
+  async function handleDelete(id) {
+    await deleteEvent(id)
+    setEvents(prev => prev.filter(e => e.id !== id))
   }
 
   async function refreshEvents() {
@@ -137,7 +142,7 @@ export default function App() {
         )}
 
         {phase === 'idle' && tab === 'History' && (
-          <EventList events={events} />
+          <EventList events={events} onDelete={handleDelete} />
         )}
 
         {phase === 'idle' && tab === 'Trends' && (

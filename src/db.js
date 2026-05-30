@@ -48,6 +48,11 @@ export async function replaceWithExtracted(placeholderId, confirmedEvents) {
   return saved
 }
 
+export async function deleteEvent(id) {
+  const db = await getDB()
+  return db.delete(STORE, id)
+}
+
 export async function getAllEvents() {
   const db = await getDB()
   const all = await db.getAll(STORE)
