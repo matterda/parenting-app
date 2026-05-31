@@ -4,6 +4,7 @@ import { getTheme, applyTheme } from '../theme'
 import { getNotifSettings, saveNotifSettings, requestPermission } from '../notifications'
 
 const KEY = 'anthropic_api_key'
+const SYNC_KEY = 'firebase_sync_url'
 const THEMES = ['system', 'light', 'dark']
 const DELAY_OPTIONS = [1, 2, 3, 4]
 const FILTER_OPTIONS = [
@@ -15,6 +16,8 @@ const FILTER_OPTIONS = [
 export default function Settings({ onNotifSettingsChanged }) {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem(KEY) ?? '')
   const [saved, setSaved] = useState(false)
+  const [syncUrl, setSyncUrl] = useState(() => localStorage.getItem(SYNC_KEY) ?? '')
+  const [syncSaved, setSyncSaved] = useState(false)
   const [theme, setTheme] = useState(getTheme)
   const [notif, setNotif] = useState(getNotifSettings)
   const [permState, setPermState] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'))
@@ -23,6 +26,12 @@ export default function Settings({ onNotifSettingsChanged }) {
     localStorage.setItem(KEY, apiKey.trim())
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  function saveSyncUrl() {
+    localStorage.setItem(SYNC_KEY, syncUrl.trim())
+    setSyncSaved(true)
+    setTimeout(() => setSyncSaved(false), 2000)
   }
 
   function chooseTheme(t) {
@@ -79,6 +88,28 @@ export default function Settings({ onNotifSettingsChanged }) {
         </button>
         <p className="text-xs text-gray-400 dark:text-gray-500">
           Stored only in this browser's localStorage. Never sent anywhere except the Anthropic API.
+        </p>
+      </div>
+
+      <hr className="border-gray-100 dark:border-gray-800" />
+
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Firebase sync URL</label>
+        <input
+          type="url"
+          className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-4 py-2.5 text-sm font-mono shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+          placeholder="https://your-app-default-rtdb.firebaseio.com"
+          value={syncUrl}
+          onChange={e => setSyncUrl(e.target.value)}
+        />
+        <button
+          onClick={saveSyncUrl}
+          className="self-start rounded-xl bg-violet-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 transition"
+        >
+          {syncSaved ? 'Saved ✓' : 'Save URL'}
+        </button>
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          Paste the same URL on both devices to share a live database. Leave empty to use local-only mode.
         </p>
       </div>
 

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { addRawEvent, replaceWithExtracted, getAllEvents, deleteEvent, updateEvent } from './db'
+import { addRawEvent, replaceWithExtracted, getAllEvents, deleteEvent, updateEvent, upsertEvent } from './db'
 import { extractEvents } from './api'
 import { scheduleCheck } from './notifications'
+import { syncPull, syncPush, syncDelete } from './sync'
 import LogInput from './components/LogInput'
 import EventList from './components/EventList'
 import EchoLoop from './components/EchoLoop'
@@ -28,16 +29,28 @@ export default function App() {
   const [prefilledText, setPrefilledText] = useState('')
 
   useEffect(() => {
-    getAllEvents().then(evs => {
+    async function init() {
+      // Pull remote events first, upsert into local DB, then load all
+      const remote = await syncPull()
+      for (const ev of remote) await upsertEvent(ev)
+      const evs = await getAllEvents()
       setEvents(evs)
       scheduleCheck(evs)
-    })
+    }
+    init()
   }, [])
 
-  // Re-schedule when returning to the app
+  // Pull remote + re-schedule when returning to the app
   useEffect(() => {
-    function onVisible() {
-      if (document.visibilityState === 'visible') scheduleCheck(events)
+    async function onVisible() {
+      if (document.visibilityState !== 'visible') return
+      const remote = await syncPull()
+      if (remote.length > 0) {
+        for (const ev of remote) await upsertEvent(ev)
+        await refreshEvents()
+      } else {
+        scheduleCheck(events)
+      }
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
@@ -113,6 +126,7 @@ export default function App() {
   async function handleDelete(id) {
     await deleteEvent(id)
     setEvents(prev => prev.filter(e => e.id !== id))
+    syncDelete(id)
   }
 
   async function handleEdit(id, patch) {
@@ -124,6 +138,7 @@ export default function App() {
     const all = await getAllEvents()
     setEvents(all)
     scheduleCheck(all)
+    syncPush(all)
   }
 
   return (

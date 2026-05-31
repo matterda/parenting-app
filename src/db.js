@@ -55,6 +55,13 @@ export async function updateEvent(id, patch) {
   return db.put(STORE, { ...existing, ...patch })
 }
 
+// Upsert: create if not present, merge if present (used for sync pull)
+export async function upsertEvent(ev) {
+  const db = await getDB()
+  const existing = await db.get(STORE, ev.id)
+  return db.put(STORE, existing ? { ...existing, ...ev } : ev)
+}
+
 export async function deleteEvent(id) {
   const db = await getDB()
   return db.delete(STORE, id)
