@@ -149,6 +149,11 @@ function getConfirmableFields(event) {
     add('duration_min', 'min', d.duration_min)
     add('side', 'side', d.side)
   }
+  if (event.type === 'pumping') {
+    add('volume_ml', 'ml', d.volume_ml)
+    add('duration_min', 'min', d.duration_min)
+    add('side', 'side', d.side)
+  }
   if (event.type === 'sleep') {
     add('timestamp_end', 'end time', event.timestamp_end)
   }

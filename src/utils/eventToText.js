@@ -19,6 +19,12 @@ export function eventToText(event) {
       }
       return `Fed · ${source}${vol}${dur}${side} · ${time}`
     }
+    case 'pumping': {
+      const vol = d.volume_ml != null ? ` ${d.volume_ml}ml` : ''
+      const dur = d.duration_min != null ? ` for ${d.duration_min} min` : ''
+      const side = d.side && d.side !== 'null' ? ` (${d.side})` : ''
+      return `Pumping${vol}${dur}${side} · ${time}`
+    }
     case 'sleep': {
       const end = event.timestamp_end ? ` → ${formatTime(event.timestamp_end)}` : ' (ongoing)'
       return `Sleep · ${time}${end}`
@@ -50,6 +56,7 @@ export const FIELD_LABELS = {
   volume_ml: 'volume (ml)',
   duration_min: 'duration (min)',
   milk_type: 'milk type',
+  // pumping shares volume_ml, duration_min, side
   side: 'side',
   kind: 'diaper type',
   value: 'value',

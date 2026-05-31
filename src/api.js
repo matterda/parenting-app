@@ -30,7 +30,7 @@ SCHEMA:
 {
   "events": [
     {
-      "type": "feed | sleep | diaper | weight | temperature | medication | note | milestone | question_for_pediatrician",
+      "type": "feed | sleep | diaper | pumping | weight | temperature | medication | note | milestone | question_for_pediatrician",
       "timestamp_start": "ISO 8601",
       "timestamp_end": "ISO 8601 | null",
       "data": {
@@ -39,6 +39,8 @@ SCHEMA:
         //   method "bottle" + milk_type "breast_milk" = pumped/expressed breast milk from a bottle
         //   method "bottle" + milk_type "formula"     = formula from a bottle
         //   if milk type is not mentioned and method is bottle, set milk_type null and add "milk_type" to needs_confirmation
+        // pumping:     { volume_ml: number|null, duration_min: number|null, side: "L|R|both|null" }
+        //   Use when the parent is expressing/pumping breast milk (not a feed)
         // sleep:       { } (uses start/end)
         // diaper:      { kind: "wet|dirty|both" }  — wet = pee only, dirty = poo only, both = pee and poo
         // weight:      { value: number, unit: "kg|g|lb|oz" }

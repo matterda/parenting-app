@@ -9,6 +9,7 @@ const TYPE_COLORS = {
   temperature: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
   medication: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
   milestone: 'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300',
+  pumping: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
   note: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
   question_for_pediatrician: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
 }
