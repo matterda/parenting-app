@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
-export default function LogInput({ onAdd }) {
-  const [text, setText] = useState('')
+export default function LogInput({ onAdd, defaultValue = '' }) {
+  const [text, setText] = useState(defaultValue)
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit(e) {

@@ -39,7 +39,7 @@ export default function TrendView({ events }) {
         <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Last 7 days</h2>
         <BarRow title="Feeds / day" series={series} field="feeds" color="bg-blue-400" />
         <BarRow title="Total sleep (hrs)" series={series} field="sleepHours" color="bg-indigo-400" />
-        <BarRow title="Diapers / day" series={series} field="diapers" color="bg-yellow-400" />
+        <StackedBarRow title="Diapers / day" series={series} />
       </section>
     </div>
   )
@@ -73,6 +73,38 @@ function LastLine({ label, event }) {
 }
 
 const TRACK_PX = 80
+
+function StackedBarRow({ title, series }) {
+  const max = Math.max(...series.map(d => d.diapersPee + d.diapersPoo), 1)
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-1.5">
+        <span className="text-xs text-gray-400 dark:text-gray-500">{title}</span>
+        <span className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500">
+          <span className="inline-block w-2 h-2 rounded-sm bg-yellow-400" /> pee
+          <span className="inline-block w-2 h-2 rounded-sm bg-amber-700 ml-1" /> poo
+        </span>
+      </div>
+      <div className="flex items-end gap-2">
+        {series.map(d => {
+          const total = d.diapersPee + d.diapersPoo
+          const peePx = d.diapersPee > 0 ? Math.max((d.diapersPee / max) * TRACK_PX, 4) : 0
+          const pooPx = d.diapersPoo > 0 ? Math.max((d.diapersPoo / max) * TRACK_PX, 4) : 0
+          return (
+            <div key={d.key} className="flex-1 flex flex-col items-center gap-1">
+              <div className="w-full flex flex-col justify-end" style={{ height: TRACK_PX }}>
+                <div className="w-full rounded-t bg-amber-700" style={{ height: pooPx }} title={`poo: ${d.diapersPoo}`} />
+                <div className="w-full bg-yellow-400" style={{ height: peePx }} title={`pee: ${d.diapersPee}`} />
+              </div>
+              <div className="text-[10px] text-gray-500 dark:text-gray-400">{total}</div>
+              <div className="text-[10px] text-gray-300 dark:text-gray-600">{d.label}</div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 function BarRow({ title, series, field, color }) {
   const max = Math.max(...series.map(d => d[field]), 1)

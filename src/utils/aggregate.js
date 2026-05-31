@@ -37,11 +37,14 @@ export function dailySeries(events, days = 7) {
 
     const dayEvents = events.filter(e => e.extracted && localDayKey(e.timestamp_start) === key)
 
+    const isDiaper = e => e.type === 'diaper'
     series.push({
       key,
       label: day.toLocaleDateString([], { weekday: 'short' }),
       feeds: dayEvents.filter(e => e.type === 'feed').length,
-      diapers: dayEvents.filter(e => e.type === 'diaper').length,
+      // pee = wet-only + both; poo = dirty-only + both
+      diapersPee: dayEvents.filter(e => isDiaper(e) && (e.data?.kind === 'wet' || e.data?.kind === 'both')).length,
+      diapersPoo: dayEvents.filter(e => isDiaper(e) && (e.data?.kind === 'dirty' || e.data?.kind === 'both')).length,
       sleepHours: totalSleepHours(dayEvents),
     })
   }
