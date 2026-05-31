@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { addRawEvent, replaceWithExtracted, getAllEvents, deleteEvent, updateEvent } from './db'
 import { extractEvents } from './api'
+import { scheduleCheck } from './notifications'
 import LogInput from './components/LogInput'
 import EventList from './components/EventList'
 import EchoLoop from './components/EchoLoop'
@@ -24,10 +25,23 @@ export default function App() {
   const [pendingId, setPendingId] = useState(null)
   const [pendingText, setPendingText] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
+  const [prefilledText, setPrefilledText] = useState('')
 
   useEffect(() => {
-    getAllEvents().then(setEvents)
+    getAllEvents().then(evs => {
+      setEvents(evs)
+      scheduleCheck(evs)
+    })
   }, [])
+
+  // Re-schedule when returning to the app
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === 'visible') scheduleCheck(events)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [events])
 
   const activeSleep = getActiveSleep(events)
 
@@ -76,7 +90,9 @@ export default function App() {
   }
 
   function handleReject() {
+    const text = pendingText
     reset()
+    setPrefilledText(text)
     setTab('Log')
   }
 
@@ -99,9 +115,15 @@ export default function App() {
     setEvents(prev => prev.filter(e => e.id !== id))
   }
 
+  async function handleEdit(id, patch) {
+    await updateEvent(id, patch)
+    await refreshEvents()
+  }
+
   async function refreshEvents() {
     const all = await getAllEvents()
     setEvents(all)
+    scheduleCheck(all)
   }
 
   return (
@@ -170,12 +192,12 @@ export default function App() {
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Describe what happened in plain language. Tap the mic on your keyboard to dictate.
             </p>
-            <LogInput onAdd={handleAdd} />
+            <LogInput key={prefilledText} defaultValue={prefilledText} onAdd={handleAdd} />
           </section>
         )}
 
         {phase === 'idle' && tab === 'History' && (
-          <EventList events={events} onDelete={handleDelete} />
+          <EventList events={events} onDelete={handleDelete} onEdit={handleEdit} />
         )}
 
         {phase === 'idle' && tab === 'Trends' && (
@@ -183,7 +205,7 @@ export default function App() {
         )}
 
         {phase === 'idle' && tab === 'Settings' && (
-          <Settings />
+          <Settings onNotifSettingsChanged={() => scheduleCheck(events)} />
         )}
       </main>
     </div>

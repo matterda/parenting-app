@@ -1,14 +1,23 @@
 import { useState } from 'react'
 import { getAllEvents } from '../db'
 import { getTheme, applyTheme } from '../theme'
+import { getNotifSettings, saveNotifSettings, requestPermission } from '../notifications'
 
 const KEY = 'anthropic_api_key'
 const THEMES = ['system', 'light', 'dark']
+const DELAY_OPTIONS = [1, 2, 3, 4]
+const FILTER_OPTIONS = [
+  { value: 'any', label: 'Any feed' },
+  { value: 'breast', label: 'Breast only' },
+  { value: 'formula', label: 'Formula only' },
+]
 
-export default function Settings() {
+export default function Settings({ onNotifSettingsChanged }) {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem(KEY) ?? '')
   const [saved, setSaved] = useState(false)
   const [theme, setTheme] = useState(getTheme)
+  const [notif, setNotif] = useState(getNotifSettings)
+  const [permState, setPermState] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'))
 
   function saveKey() {
     localStorage.setItem(KEY, apiKey.trim())
@@ -19,6 +28,25 @@ export default function Settings() {
   function chooseTheme(t) {
     setTheme(t)
     applyTheme(t)
+  }
+
+  async function toggleNotif() {
+    if (!notif.enabled && permState !== 'granted') {
+      const result = await requestPermission()
+      setPermState(result)
+      if (result !== 'granted') return
+    }
+    const next = { ...notif, enabled: !notif.enabled }
+    setNotif(next)
+    saveNotifSettings(next)
+    onNotifSettingsChanged?.(next)
+  }
+
+  function updateNotif(patch) {
+    const next = { ...notif, ...patch }
+    setNotif(next)
+    saveNotifSettings(next)
+    onNotifSettingsChanged?.(next)
   }
 
   async function exportJSON() {
@@ -73,6 +101,88 @@ export default function Settings() {
             </button>
           ))}
         </div>
+      </div>
+
+      <hr className="border-gray-100 dark:border-gray-800" />
+
+      {/* Feed reminder */}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Feed reminder</p>
+
+        {permState === 'unsupported' && (
+          <p className="text-xs text-gray-400 dark:text-gray-500">Notifications are not supported in this browser.</p>
+        )}
+        {permState === 'denied' && (
+          <p className="text-xs text-red-500">Notification permission was denied. Enable it in your browser settings.</p>
+        )}
+
+        {permState !== 'unsupported' && (
+          <>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div
+                onClick={toggleNotif}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  notif.enabled ? 'bg-violet-600' : 'bg-gray-200 dark:bg-gray-700'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    notif.enabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </div>
+              <span className="text-sm text-gray-700 dark:text-gray-200">
+                Remind me to feed
+              </span>
+            </label>
+
+            {notif.enabled && (
+              <div className="flex flex-col gap-3 pl-1">
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Remind after</p>
+                  <div className="flex gap-2">
+                    {DELAY_OPTIONS.map(h => (
+                      <button
+                        key={h}
+                        onClick={() => updateNotif({ delayHours: h })}
+                        className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                          notif.delayHours === h
+                            ? 'bg-violet-600 text-white'
+                            : 'border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                        }`}
+                      >
+                        {h}h
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Feed type to watch</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {FILTER_OPTIONS.map(o => (
+                      <button
+                        key={o.value}
+                        onClick={() => updateNotif({ feedFilter: o.value })}
+                        className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                          notif.feedFilter === o.value
+                            ? 'bg-violet-600 text-white'
+                            : 'border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                        }`}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          Only fires while the app is open. No push server involved.
+        </p>
       </div>
 
       <hr className="border-gray-100 dark:border-gray-800" />

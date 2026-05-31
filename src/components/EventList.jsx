@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { eventToText } from '../utils/eventToText'
+import EditEntry from './EditEntry'
 
 const TYPE_COLORS = {
   feed: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
@@ -14,7 +15,7 @@ const TYPE_COLORS = {
   question_for_pediatrician: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
 }
 
-export default function EventList({ events, onDelete }) {
+export default function EventList({ events, onDelete, onEdit }) {
   if (events.length === 0) {
     return (
       <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-8">
@@ -26,12 +27,50 @@ export default function EventList({ events, onDelete }) {
   return (
     <ul className="flex flex-col gap-3">
       {events.map(ev => (
-        <li key={ev.id} className="relative rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 pr-12 shadow-sm">
-          {ev.extracted ? <ExtractedEntry ev={ev} /> : <RawEntry ev={ev} />}
-          <DeleteButton onConfirm={() => onDelete(ev.id)} />
-        </li>
+        <EventItem key={ev.id} ev={ev} onDelete={onDelete} onEdit={onEdit} />
       ))}
     </ul>
+  )
+}
+
+function EventItem({ ev, onDelete, onEdit }) {
+  const [editing, setEditing] = useState(false)
+
+  function handleSave(patch) {
+    onEdit(ev.id, patch)
+    setEditing(false)
+  }
+
+  return (
+    <li className="relative rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-sm">
+      <div className="pr-16">
+        {ev.extracted ? <ExtractedEntry ev={ev} /> : <RawEntry ev={ev} />}
+      </div>
+
+      {/* Action buttons top-right */}
+      {!editing && (
+        <div className="absolute top-2 right-2 flex gap-1">
+          <EditButton onEdit={() => setEditing(true)} />
+          <DeleteButton onConfirm={() => onDelete(ev.id)} />
+        </div>
+      )}
+
+      {editing && (
+        <EditEntry ev={ev} onSave={handleSave} onCancel={() => setEditing(false)} />
+      )}
+    </li>
+  )
+}
+
+function EditButton({ onEdit }) {
+  return (
+    <button
+      onClick={onEdit}
+      aria-label="Edit entry"
+      className="rounded-md px-2 py-1 text-gray-300 hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/30 transition"
+    >
+      ✎
+    </button>
   )
 }
 
@@ -40,7 +79,7 @@ function DeleteButton({ onConfirm }) {
 
   if (armed) {
     return (
-      <div className="absolute top-2 right-2 flex gap-1">
+      <div className="flex gap-1">
         <button
           onClick={onConfirm}
           className="rounded-md bg-red-500 px-2 py-1 text-xs font-semibold text-white hover:bg-red-600"
@@ -49,7 +88,7 @@ function DeleteButton({ onConfirm }) {
         </button>
         <button
           onClick={() => setArmed(false)}
-          className="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-500 hover:bg-gray-200"
+          className="rounded-md bg-gray-100 dark:bg-gray-800 px-2 py-1 text-xs text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700"
         >
           Cancel
         </button>
@@ -61,7 +100,7 @@ function DeleteButton({ onConfirm }) {
     <button
       onClick={() => setArmed(true)}
       aria-label="Delete entry"
-      className="absolute top-2 right-2 rounded-md px-2 py-1 text-gray-300 hover:text-red-500 hover:bg-red-50 transition"
+      className="rounded-md px-2 py-1 text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
     >
       ✕
     </button>
