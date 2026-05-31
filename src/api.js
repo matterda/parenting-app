@@ -6,7 +6,8 @@ const BABY = {
 const SYSTEM_PROMPT = `You convert a parent's free-text or dictated note about their baby into structured log events.
 
 CONTEXT YOU RECEIVE:
-- current_datetime (ISO, with timezone)
+- current_datetime (ISO 8601 in the user's local time with UTC offset)
+- timezone (IANA name, e.g. "Europe/Rome" — use this to resolve ambiguous times)
 - baby: { name, date_of_birth }
 - active_sleep_since: ISO timestamp if the baby is currently sleeping (no end recorded yet), or null
 - the parent's raw note
@@ -63,10 +64,12 @@ export async function extractEvents(rawText, activeSleepSince = null) {
   if (!apiKey) throw new Error('No API key — add it in Settings.')
 
   const now = new Date()
-  const current_datetime = now.toISOString().replace('Z', getTimezoneOffset(now))
+  const current_datetime = toLocalISO(now)
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   const userMessage = JSON.stringify({
     current_datetime,
+    timezone,
     baby: BABY,
     active_sleep_since: activeSleepSince,
     note: rawText
@@ -103,10 +106,19 @@ export async function extractEvents(rawText, activeSleepSince = null) {
   }
 }
 
-function getTimezoneOffset(date) {
-  const off = -date.getTimezoneOffset()
+// Build an ISO 8601 string in local time (not UTC) with the correct offset.
+// toISOString() is always UTC, so we can't use it directly here.
+function toLocalISO(date) {
+  const off = -date.getTimezoneOffset() // minutes ahead of UTC
   const sign = off >= 0 ? '+' : '-'
-  const h = String(Math.floor(Math.abs(off) / 60)).padStart(2, '0')
-  const m = String(Math.abs(off) % 60).padStart(2, '0')
-  return `${sign}${h}:${m}`
+  const oh = String(Math.floor(Math.abs(off) / 60)).padStart(2, '0')
+  const om = String(Math.abs(off) % 60).padStart(2, '0')
+  const offset = `${sign}${oh}:${om}`
+  const Y = date.getFullYear()
+  const M = String(date.getMonth() + 1).padStart(2, '0')
+  const D = String(date.getDate()).padStart(2, '0')
+  const h = String(date.getHours()).padStart(2, '0')
+  const m = String(date.getMinutes()).padStart(2, '0')
+  const s = String(date.getSeconds()).padStart(2, '0')
+  return `${Y}-${M}-${D}T${h}:${m}:${s}${offset}`
 }
