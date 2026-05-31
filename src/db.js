@@ -48,6 +48,13 @@ export async function replaceWithExtracted(placeholderId, confirmedEvents) {
   return saved
 }
 
+export async function updateEvent(id, patch) {
+  const db = await getDB()
+  const existing = await db.get(STORE, id)
+  if (!existing) throw new Error(`Event ${id} not found`)
+  return db.put(STORE, { ...existing, ...patch })
+}
+
 export async function deleteEvent(id) {
   const db = await getDB()
   return db.delete(STORE, id)

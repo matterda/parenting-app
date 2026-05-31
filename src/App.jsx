@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react'
-import { addRawEvent, replaceWithExtracted, getAllEvents, deleteEvent } from './db'
+import { addRawEvent, replaceWithExtracted, getAllEvents, deleteEvent, updateEvent } from './db'
 import { extractEvents } from './api'
 import LogInput from './components/LogInput'
 import EventList from './components/EventList'
 import EchoLoop from './components/EchoLoop'
 import TrendView from './components/TrendView'
 import Settings from './components/Settings'
+import ActiveSleepBanner from './components/ActiveSleepBanner'
 
 const TABS = ['Log', 'History', 'Trends', 'Settings']
+
+function getActiveSleep(events) {
+  return events.find(e => e.extracted && e.type === 'sleep' && !e.timestamp_end) ?? null
+}
 
 export default function App() {
   const [tab, setTab] = useState('Log')
@@ -15,8 +20,8 @@ export default function App() {
 
   // Extraction state
   const [phase, setPhase] = useState('idle') // 'idle' | 'extracting' | 'confirming' | 'error'
-  const [extracted, setExtracted] = useState(null) // { events, adviceRequested }
-  const [pendingId, setPendingId] = useState(null) // placeholder record id
+  const [extracted, setExtracted] = useState(null)
+  const [pendingId, setPendingId] = useState(null)
   const [pendingText, setPendingText] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -24,38 +29,61 @@ export default function App() {
     getAllEvents().then(setEvents)
   }, [])
 
+  const activeSleep = getActiveSleep(events)
+
   async function handleAdd(rawText) {
     setPendingText(rawText)
     setPhase('extracting')
 
-    // Save raw immediately — nothing lost if API fails
     const placeholder = await addRawEvent(rawText)
     setPendingId(placeholder.id)
 
     try {
-      const result = await extractEvents(rawText)
+      const result = await extractEvents(rawText, activeSleep?.timestamp_start ?? null)
       setExtracted(result)
       setPhase('confirming')
     } catch (err) {
       setErrorMsg(err.message)
       setPhase('error')
-      // Keep the raw placeholder in DB; user can still see it in History
       await refreshEvents()
     }
   }
 
   async function handleConfirm(confirmedEvents) {
-    const saved = await replaceWithExtracted(pendingId, confirmedEvents)
+    // If any event closes the active sleep, update the existing record instead of creating a new one
+    if (activeSleep) {
+      const closer = confirmedEvents.find(e => e.closes_active_sleep && e.type === 'sleep')
+      if (closer) {
+        await updateEvent(activeSleep.id, { timestamp_end: closer.timestamp_end })
+        const remaining = confirmedEvents.filter(e => e !== closer)
+        if (remaining.length > 0) {
+          await replaceWithExtracted(pendingId, remaining)
+        } else {
+          // Nothing else to save — just delete the placeholder
+          await deleteEvent(pendingId)
+        }
+        await refreshEvents()
+        reset()
+        setTab('History')
+        return
+      }
+    }
+
+    await replaceWithExtracted(pendingId, confirmedEvents)
     await refreshEvents()
     reset()
     setTab('History')
   }
 
   function handleReject() {
-    // Remove placeholder and send user back to Log with text pre-filled
-    // (placeholder stays in DB as a safety net — user can delete from History later)
     reset()
     setTab('Log')
+  }
+
+  async function handleMarkAwake() {
+    if (!activeSleep) return
+    await updateEvent(activeSleep.id, { timestamp_end: new Date().toISOString() })
+    await refreshEvents()
   }
 
   function reset() {
@@ -100,7 +128,6 @@ export default function App() {
 
       <main className="flex-1 overflow-y-auto p-4 max-w-xl mx-auto w-full">
 
-        {/* Extraction overlay — shown on top of Log tab */}
         {phase === 'extracting' && (
           <div className="flex flex-col items-center justify-center gap-4 py-16">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-600 border-t-transparent" />
@@ -134,6 +161,12 @@ export default function App() {
 
         {phase === 'idle' && tab === 'Log' && (
           <section className="flex flex-col gap-4">
+            {activeSleep && (
+              <ActiveSleepBanner
+                since={activeSleep.timestamp_start}
+                onMarkAwake={handleMarkAwake}
+              />
+            )}
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Describe what happened in plain language. Tap the mic on your keyboard to dictate.
             </p>

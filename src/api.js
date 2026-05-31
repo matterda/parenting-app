@@ -8,13 +8,18 @@ const SYSTEM_PROMPT = `You convert a parent's free-text or dictated note about t
 CONTEXT YOU RECEIVE:
 - current_datetime (ISO, with timezone)
 - baby: { name, date_of_birth }
+- active_sleep_since: ISO timestamp if the baby is currently sleeping (no end recorded yet), or null
 - the parent's raw note
 
 YOUR JOB:
 1. Extract every loggable event into the schema below. One note may contain several.
 2. Resolve relative and vague times against current_datetime ("an hour ago", "at 3", "last night", "this morning"). When a time is genuinely ambiguous (am vs pm, today vs yesterday, a bare number), pick the most likely reading AND add the field to needs_confirmation. Never silently guess on times — flag them.
-3. Preserve qualitative detail in context_note verbatim-ish (e.g. "seemed in pain", "warm to the touch", "refused the bottle"). This detail is valuable; do not discard it.
-4. Set confidence:"low" and populate needs_confirmation for any numeric value or time you are not sure about. A misread volume (120 -> 12) corrupts every downstream trend, so be conservative.
+3. If active_sleep_since is not null and the note indicates the baby woke up or stopped sleeping,
+   output a sleep event with timestamp_start = active_sleep_since and timestamp_end = the resolved
+   wake time. Set "closes_active_sleep": true on that event so the app can update the existing record
+   instead of creating a new one.
+4. Preserve qualitative detail in context_note verbatim-ish (e.g. "seemed in pain", "warm to the touch", "refused the bottle"). This detail is valuable; do not discard it.
+5. Set confidence:"low" and populate needs_confirmation for any numeric value or time you are not sure about. A misread volume (120 -> 12) corrupts every downstream trend, so be conservative.
 
 HARD RULES:
 - You DESCRIBE and ORGANIZE the parent's data. You do NOT interpret, diagnose, advise, or flag anything as concerning or normal. No medical judgment of any kind.
@@ -51,7 +56,7 @@ SCHEMA:
   "advice_requested": false
 }`
 
-export async function extractEvents(rawText) {
+export async function extractEvents(rawText, activeSleepSince = null) {
   const apiKey = localStorage.getItem('anthropic_api_key')
   if (!apiKey) throw new Error('No API key — add it in Settings.')
 
@@ -61,6 +66,7 @@ export async function extractEvents(rawText) {
   const userMessage = JSON.stringify({
     current_datetime,
     baby: BABY,
+    active_sleep_since: activeSleepSince,
     note: rawText
   })
 
