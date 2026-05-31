@@ -4,18 +4,29 @@ export function eventToText(event) {
 
   switch (event.type) {
     case 'feed': {
-      const method = d.method === 'breast' ? 'breastfed' : 'bottle fed'
       const vol = d.volume_ml != null ? ` ${d.volume_ml}ml` : ''
       const dur = d.duration_min != null ? ` for ${d.duration_min} min` : ''
       const side = d.side && d.side !== 'null' ? ` (${d.side} side)` : ''
-      return `Fed · ${method}${vol}${dur}${side} · ${time}`
+      let source
+      if (d.method === 'breast') {
+        source = 'breast'
+      } else if (d.milk_type === 'breast_milk') {
+        source = 'bottle (expressed)'
+      } else if (d.milk_type === 'formula') {
+        source = 'bottle (formula)'
+      } else {
+        source = 'bottle'
+      }
+      return `Fed · ${source}${vol}${dur}${side} · ${time}`
     }
     case 'sleep': {
       const end = event.timestamp_end ? ` → ${formatTime(event.timestamp_end)}` : ' (ongoing)'
       return `Sleep · ${time}${end}`
     }
-    case 'diaper':
-      return `Diaper · ${d.kind ?? 'unknown'} · ${time}`
+    case 'diaper': {
+      const diaperLabel = { wet: 'pee', dirty: 'poo', both: 'pee + poo' }[d.kind] ?? d.kind ?? 'unknown'
+      return `Diaper · ${diaperLabel} · ${time}`
+    }
     case 'weight':
       return `Weight · ${d.value} ${d.unit} · ${time}`
     case 'temperature':
@@ -38,6 +49,7 @@ export const FIELD_LABELS = {
   timestamp_end: 'end time',
   volume_ml: 'volume (ml)',
   duration_min: 'duration (min)',
+  milk_type: 'milk type',
   side: 'side',
   kind: 'diaper type',
   value: 'value',

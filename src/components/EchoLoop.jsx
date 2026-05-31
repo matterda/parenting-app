@@ -144,6 +144,7 @@ function getConfirmableFields(event) {
   }
 
   if (event.type === 'feed') {
+    add('milk_type', 'milk type', d.milk_type)
     add('volume_ml', 'ml', d.volume_ml)
     add('duration_min', 'min', d.duration_min)
     add('side', 'side', d.side)
