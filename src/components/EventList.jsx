@@ -15,7 +15,15 @@ const TYPE_COLORS = {
   question_for_pediatrician: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
 }
 
+const TYPE_LABELS = {
+  feed: 'feed', sleep: 'sleep', diaper: 'diaper', weight: 'weight',
+  temperature: 'temp', medication: 'meds', milestone: 'milestone',
+  pumping: 'pumping', note: 'note', question_for_pediatrician: 'question',
+}
+
 export default function EventList({ events, onDelete, onEdit }) {
+  const [filter, setFilter] = useState('all')
+
   if (events.length === 0) {
     return (
       <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-8">
@@ -24,12 +32,58 @@ export default function EventList({ events, onDelete, onEdit }) {
     )
   }
 
+  // Derive the set of types that actually appear in the list
+  const presentTypes = [...new Set(events.map(e => e.type ?? 'raw').filter(Boolean))]
+
+  const visible = filter === 'all'
+    ? events
+    : filter === 'raw'
+      ? events.filter(e => !e.extracted)
+      : events.filter(e => e.type === filter)
+
   return (
-    <ul className="flex flex-col gap-3">
-      {events.map(ev => (
-        <EventItem key={ev.id} ev={ev} onDelete={onDelete} onEdit={onEdit} />
-      ))}
-    </ul>
+    <div className="flex flex-col gap-3">
+      {/* Filter chips */}
+      <div className="flex flex-wrap gap-1.5">
+        <FilterChip label="All" active={filter === 'all'} onClick={() => setFilter('all')} />
+        {presentTypes.map(t => (
+          <FilterChip
+            key={t}
+            label={TYPE_LABELS[t] ?? t}
+            active={filter === t}
+            onClick={() => setFilter(t)}
+          />
+        ))}
+        {events.some(e => !e.extracted) && (
+          <FilterChip label="raw" active={filter === 'raw'} onClick={() => setFilter('raw')} />
+        )}
+      </div>
+
+      {visible.length === 0 ? (
+        <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-4">No entries of this type.</p>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {visible.map(ev => (
+            <EventItem key={ev.id} ev={ev} onDelete={onDelete} onEdit={onEdit} />
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function FilterChip({ label, active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+        active
+          ? 'bg-violet-600 text-white'
+          : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+      }`}
+    >
+      {label}
+    </button>
   )
 }
 
@@ -47,7 +101,6 @@ function EventItem({ ev, onDelete, onEdit }) {
         {ev.extracted ? <ExtractedEntry ev={ev} /> : <RawEntry ev={ev} />}
       </div>
 
-      {/* Action buttons top-right */}
       {!editing && (
         <div className="absolute top-2 right-2 flex gap-1">
           <EditButton onEdit={() => setEditing(true)} />
@@ -113,7 +166,7 @@ function ExtractedEntry({ ev }) {
     <>
       <div className="flex items-start gap-2">
         <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold ${colorClass}`}>
-          {ev.type}
+          {TYPE_LABELS[ev.type] ?? ev.type}
         </span>
         <p className="text-sm text-gray-800 dark:text-gray-100 leading-relaxed">{eventToText(ev)}</p>
       </div>

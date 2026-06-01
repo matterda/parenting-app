@@ -1,4 +1,5 @@
-import { lastOfType, todayCounts, dailySeries, relativeTime } from '../utils/aggregate'
+import { useState } from 'react'
+import { lastOfType, todayCounts, dailySeries, relativeTime, weightSeries } from '../utils/aggregate'
 import { eventToText } from '../utils/eventToText'
 
 export default function TrendView({ events }) {
@@ -15,32 +16,45 @@ export default function TrendView({ events }) {
   const lastFeed = lastOfType(events, 'feed')
   const lastSleep = lastOfType(events, 'sleep')
   const lastDiaper = lastOfType(events, 'diaper')
+  const lastPumping = lastOfType(events, 'pumping')
   const series = dailySeries(events, 7)
+  const weights = weightSeries(events)
 
   return (
     <div className="flex flex-col gap-6">
       {/* Today at a glance */}
       <section>
         <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Today at a glance</h2>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           <StatCard label="Feeds" value={counts.feed} />
           <StatCard label="Sleeps" value={counts.sleep} />
           <StatCard label="Diapers" value={counts.diaper} />
+          <StatCard label="Pumping" value={counts.pumping} />
         </div>
         <div className="mt-3 flex flex-col gap-1.5">
           <LastLine label="Last feed" event={lastFeed} />
           <LastLine label="Last sleep" event={lastSleep} />
           <LastLine label="Last diaper" event={lastDiaper} />
+          {lastPumping && <LastLine label="Last pumping" event={lastPumping} />}
         </div>
       </section>
 
       {/* 7-day bars */}
       <section className="flex flex-col gap-5">
         <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Last 7 days</h2>
-        <BarRow title="Feeds / day" series={series} field="feeds" color="bg-blue-400" />
-        <BarRow title="Total sleep (hrs)" series={series} field="sleepHours" color="bg-indigo-400" />
+        <BarRow title="Feeds / day" series={series} field="feeds" color="bg-blue-400" unit="" />
+        <BarRow title="Pumping sessions / day" series={series} field="pumpings" color="bg-rose-400" unit="" />
+        <BarRow title="Total sleep (hrs)" series={series} field="sleepHours" color="bg-indigo-400" unit="h" />
         <StackedBarRow title="Diapers / day" series={series} />
       </section>
+
+      {/* Weight over time */}
+      {weights.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Weight</h2>
+          <WeightPlot weights={weights} />
+        </section>
+      )}
     </div>
   )
 }
@@ -49,7 +63,7 @@ function StatCard({ label, value }) {
   return (
     <div className="rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-3 text-center shadow-sm">
       <div className="text-2xl font-bold text-gray-800 dark:text-gray-100">{value}</div>
-      <div className="text-xs text-gray-400 dark:text-gray-500">{label}</div>
+      <div className="text-[11px] text-gray-400 dark:text-gray-500 leading-tight mt-0.5">{label}</div>
     </div>
   )
 }
@@ -72,10 +86,82 @@ function LastLine({ label, event }) {
   )
 }
 
+// ─── shared chart constants ───────────────────────────────────────────────────
 const TRACK_PX = 80
+const Y_TICKS = 3
 
+function YAxis({ max, unit = '' }) {
+  const ticks = Array.from({ length: Y_TICKS }, (_, i) =>
+    Math.round((max * (i / (Y_TICKS - 1))) * 10) / 10
+  ).reverse()
+
+  return (
+    <div className="flex flex-col justify-between pr-1 shrink-0" style={{ height: TRACK_PX }}>
+      {ticks.map((v, i) => (
+        <span key={i} className="text-[9px] text-gray-300 dark:text-gray-600 leading-none text-right">
+          {v}{unit}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function Gridlines() {
+  return (
+    <div className="absolute inset-x-0 top-0 flex flex-col justify-between pointer-events-none" style={{ height: TRACK_PX }}>
+      {Array.from({ length: Y_TICKS }).map((_, i) => (
+        <div key={i} className="w-full border-t border-gray-100 dark:border-gray-800" />
+      ))}
+    </div>
+  )
+}
+
+// ─── BarRow ───────────────────────────────────────────────────────────────────
+function BarRow({ title, series, field, color, unit }) {
+  const [tooltip, setTooltip] = useState(null)
+  const max = Math.max(...series.map(d => d[field]), 1)
+
+  return (
+    <div>
+      <div className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">{title}</div>
+      <div className="flex items-end gap-1">
+        <YAxis max={max} unit={unit} />
+        <div className="flex-1 flex items-end gap-2">
+          {series.map(d => {
+            const val = d[field]
+            const px = val > 0 ? Math.max((val / max) * TRACK_PX, 4) : 0
+            return (
+              <div key={d.key} className="flex-1 flex flex-col items-center gap-1">
+                <div className="relative w-full flex items-end justify-center" style={{ height: TRACK_PX }}>
+                  <Gridlines />
+                  <div
+                    className={`relative w-full rounded-t ${color} cursor-pointer hover:opacity-75 transition-opacity`}
+                    style={{ height: px }}
+                    onClick={() => setTooltip(tooltip === d.key ? null : d.key)}
+                  >
+                    {tooltip === d.key && (
+                      <div className="absolute -top-6 left-1/2 -translate-x-1/2 rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-1.5 py-0.5 whitespace-nowrap z-10 shadow">
+                        {val}{unit}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400">{val}{unit}</div>
+                <div className="text-[10px] text-gray-300 dark:text-gray-600">{d.label}</div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── StackedBarRow ────────────────────────────────────────────────────────────
 function StackedBarRow({ title, series }) {
+  const [tooltip, setTooltip] = useState(null)
   const max = Math.max(...series.map(d => d.diapersPee + d.diapersPoo), 1)
+
   return (
     <div>
       <div className="flex items-center gap-3 mb-1.5">
@@ -85,47 +171,82 @@ function StackedBarRow({ title, series }) {
           <span className="inline-block w-2 h-2 rounded-sm bg-amber-700 ml-1" /> poo
         </span>
       </div>
-      <div className="flex items-end gap-2">
-        {series.map(d => {
-          const total = d.diapersPee + d.diapersPoo
-          const peePx = d.diapersPee > 0 ? Math.max((d.diapersPee / max) * TRACK_PX, 4) : 0
-          const pooPx = d.diapersPoo > 0 ? Math.max((d.diapersPoo / max) * TRACK_PX, 4) : 0
-          return (
-            <div key={d.key} className="flex-1 flex flex-col items-center gap-1">
-              <div className="w-full flex flex-col justify-end" style={{ height: TRACK_PX }}>
-                <div className="w-full rounded-t bg-amber-700" style={{ height: pooPx }} title={`poo: ${d.diapersPoo}`} />
-                <div className="w-full bg-yellow-400" style={{ height: peePx }} title={`pee: ${d.diapersPee}`} />
+      <div className="flex items-end gap-1">
+        <YAxis max={max} />
+        <div className="flex-1 flex items-end gap-2">
+          {series.map(d => {
+            const total = d.diapersPee + d.diapersPoo
+            const peePx = d.diapersPee > 0 ? Math.max((d.diapersPee / max) * TRACK_PX, 4) : 0
+            const pooPx = d.diapersPoo > 0 ? Math.max((d.diapersPoo / max) * TRACK_PX, 4) : 0
+            return (
+              <div key={d.key} className="flex-1 flex flex-col items-center gap-1">
+                <div
+                  className="relative w-full flex flex-col justify-end cursor-pointer hover:opacity-75 transition-opacity"
+                  style={{ height: TRACK_PX }}
+                  onClick={() => setTooltip(tooltip === d.key ? null : d.key)}
+                >
+                  <Gridlines />
+                  <div className="relative w-full rounded-t bg-amber-700" style={{ height: pooPx }} />
+                  <div className="relative w-full bg-yellow-400" style={{ height: peePx }} />
+                  {tooltip === d.key && total > 0 && (
+                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-1.5 py-0.5 whitespace-nowrap z-10 shadow">
+                      pee {d.diapersPee} · poo {d.diapersPoo}
+                    </div>
+                  )}
+                </div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400">{total}</div>
+                <div className="text-[10px] text-gray-300 dark:text-gray-600">{d.label}</div>
               </div>
-              <div className="text-[10px] text-gray-500 dark:text-gray-400">{total}</div>
-              <div className="text-[10px] text-gray-300 dark:text-gray-600">{d.label}</div>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
     </div>
   )
 }
 
-function BarRow({ title, series, field, color }) {
-  const max = Math.max(...series.map(d => d[field]), 1)
+// ─── WeightPlot ───────────────────────────────────────────────────────────────
+function WeightPlot({ weights }) {
+  const [tooltip, setTooltip] = useState(null)
+  const values = weights.map(w => w.value)
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = max - min || 1
+  const unit = weights[weights.length - 1]?.unit ?? 'kg'
+
   return (
-    <div>
-      <div className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">{title}</div>
-      <div className="flex items-end gap-2">
-        {series.map(d => {
-          const val = d[field]
-          const px = val > 0 ? Math.max((val / max) * TRACK_PX, 4) : 0
+    <div className="flex items-end gap-1">
+      <div className="flex flex-col justify-between pr-1 shrink-0 text-[9px] text-gray-300 dark:text-gray-600 text-right" style={{ height: TRACK_PX }}>
+        <span>{max}{unit}</span>
+        <span>{((max + min) / 2).toFixed(1)}{unit}</span>
+        <span>{min}{unit}</span>
+      </div>
+      <div className="flex-1 flex items-end gap-2">
+        {weights.map(w => {
+          const px = Math.max(((w.value - min) / range) * (TRACK_PX - 12) + 12, 8)
           return (
-            <div key={d.key} className="flex-1 flex flex-col items-center gap-1">
-              <div className="w-full flex items-end justify-center" style={{ height: TRACK_PX }}>
+            <div key={w.key} className="flex-1 flex flex-col items-center gap-1">
+              <div className="relative w-full flex items-end justify-center" style={{ height: TRACK_PX }}>
+                {/* gridlines */}
+                <div className="absolute inset-x-0 top-0 flex flex-col justify-between pointer-events-none" style={{ height: TRACK_PX }}>
+                  <div className="w-full border-t border-gray-100 dark:border-gray-800" />
+                  <div className="w-full border-t border-gray-100 dark:border-gray-800" />
+                  <div className="w-full border-t border-gray-100 dark:border-gray-800" />
+                </div>
                 <div
-                  className={`w-full rounded-t ${color}`}
+                  className="relative w-full rounded-t bg-green-400 cursor-pointer hover:opacity-75 transition-opacity"
                   style={{ height: px }}
-                  title={`${val}`}
-                />
+                  onClick={() => setTooltip(tooltip === w.key ? null : w.key)}
+                >
+                  {tooltip === w.key && (
+                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-1.5 py-0.5 whitespace-nowrap z-10 shadow">
+                      {w.value}{w.unit}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="text-[10px] text-gray-500 dark:text-gray-400">{val}</div>
-              <div className="text-[10px] text-gray-300 dark:text-gray-600">{d.label}</div>
+              <div className="text-[10px] text-gray-500 dark:text-gray-400">{w.value}</div>
+              <div className="text-[10px] text-gray-300 dark:text-gray-600">{w.date}</div>
             </div>
           )
         })}

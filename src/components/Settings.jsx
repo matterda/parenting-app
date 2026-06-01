@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { getAllEvents } from '../db'
+import { getAllEvents, clearAllEvents, upsertEvent } from '../db'
 import { getTheme, applyTheme } from '../theme'
 import { getNotifSettings, saveNotifSettings, requestPermission } from '../notifications'
+import { listSnapshots, getSnapshotData } from '../utils/snapshots'
 
 const KEY = 'anthropic_api_key'
 const SYNC_KEY = 'firebase_sync_url'
+const MODEL_KEY = 'anthropic_model'
 const THEMES = ['system', 'light', 'dark']
 const DELAY_OPTIONS = [1, 2, 3, 4]
 const FILTER_OPTIONS = [
@@ -12,15 +14,22 @@ const FILTER_OPTIONS = [
   { value: 'breast', label: 'Breast only' },
   { value: 'formula', label: 'Formula only' },
 ]
+const MODELS = [
+  { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6 (default)' },
+  { value: 'claude-haiku-4-5', label: 'Haiku 4.5 (faster / cheaper)' },
+]
 
-export default function Settings({ onNotifSettingsChanged }) {
+export default function Settings({ onNotifSettingsChanged, onRestore }) {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem(KEY) ?? '')
   const [saved, setSaved] = useState(false)
   const [syncUrl, setSyncUrl] = useState(() => localStorage.getItem(SYNC_KEY) ?? '')
   const [syncSaved, setSyncSaved] = useState(false)
+  const [model, setModel] = useState(() => localStorage.getItem(MODEL_KEY) || 'claude-sonnet-4-6')
   const [theme, setTheme] = useState(getTheme)
   const [notif, setNotif] = useState(getNotifSettings)
   const [permState, setPermState] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'))
+  const [snapshots, setSnapshots] = useState(listSnapshots)
+  const [restoring, setRestoring] = useState(null)
 
   function saveKey() {
     localStorage.setItem(KEY, apiKey.trim())
@@ -32,6 +41,11 @@ export default function Settings({ onNotifSettingsChanged }) {
     localStorage.setItem(SYNC_KEY, syncUrl.trim())
     setSyncSaved(true)
     setTimeout(() => setSyncSaved(false), 2000)
+  }
+
+  function chooseModel(m) {
+    setModel(m)
+    localStorage.setItem(MODEL_KEY, m)
   }
 
   function chooseTheme(t) {
@@ -69,8 +83,22 @@ export default function Settings({ onNotifSettingsChanged }) {
     URL.revokeObjectURL(url)
   }
 
+  async function handleRestore(index) {
+    if (restoring != null) return
+    if (!window.confirm('Restore this snapshot? Current data will be replaced.')) return
+    setRestoring(index)
+    const data = getSnapshotData(index)
+    await clearAllEvents()
+    for (const ev of data) await upsertEvent(ev)
+    onRestore?.()
+    setRestoring(null)
+    setSnapshots(listSnapshots())
+  }
+
   return (
     <div className="flex flex-col gap-5">
+
+      {/* API key */}
       <div className="flex flex-col gap-2">
         <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Anthropic API key</label>
         <input
@@ -93,6 +121,32 @@ export default function Settings({ onNotifSettingsChanged }) {
 
       <hr className="border-gray-100 dark:border-gray-800" />
 
+      {/* Model */}
+      <div className="flex flex-col gap-2">
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Extraction model</p>
+        <div className="flex flex-col gap-1.5">
+          {MODELS.map(m => (
+            <label key={m.value} className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="model"
+                value={m.value}
+                checked={model === m.value}
+                onChange={() => chooseModel(m.value)}
+                className="accent-violet-600"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-200">{m.label}</span>
+            </label>
+          ))}
+        </div>
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          Haiku is ~10× cheaper and faster; Sonnet understands ambiguous notes better.
+        </p>
+      </div>
+
+      <hr className="border-gray-100 dark:border-gray-800" />
+
+      {/* Firebase */}
       <div className="flex flex-col gap-2">
         <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Firebase sync URL</label>
         <input
@@ -109,12 +163,13 @@ export default function Settings({ onNotifSettingsChanged }) {
           {syncSaved ? 'Saved ✓' : 'Save URL'}
         </button>
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          Paste the same URL on both devices to share a live database. Leave empty to use local-only mode.
+          Paste the same URL on both devices to share a live database. Leave empty for local-only mode.
         </p>
       </div>
 
       <hr className="border-gray-100 dark:border-gray-800" />
 
+      {/* Appearance */}
       <div className="flex flex-col gap-2">
         <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Appearance</p>
         <div className="flex gap-1 rounded-xl border border-gray-200 dark:border-gray-700 p-1 self-start">
@@ -144,7 +199,7 @@ export default function Settings({ onNotifSettingsChanged }) {
           <p className="text-xs text-gray-400 dark:text-gray-500">Notifications are not supported in this browser.</p>
         )}
         {permState === 'denied' && (
-          <p className="text-xs text-red-500">Notification permission was denied. Enable it in your browser settings.</p>
+          <p className="text-xs text-red-500">Notification permission was denied. Enable it in your browser/OS settings.</p>
         )}
 
         {permState !== 'unsupported' && (
@@ -156,15 +211,11 @@ export default function Settings({ onNotifSettingsChanged }) {
                   notif.enabled ? 'bg-violet-600' : 'bg-gray-200 dark:bg-gray-700'
                 }`}
               >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                    notif.enabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  notif.enabled ? 'translate-x-6' : 'translate-x-1'
+                }`} />
               </div>
-              <span className="text-sm text-gray-700 dark:text-gray-200">
-                Remind me to feed
-              </span>
+              <span className="text-sm text-gray-700 dark:text-gray-200">Remind me to feed</span>
             </label>
 
             {notif.enabled && (
@@ -173,36 +224,25 @@ export default function Settings({ onNotifSettingsChanged }) {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Remind after</p>
                   <div className="flex gap-2">
                     {DELAY_OPTIONS.map(h => (
-                      <button
-                        key={h}
-                        onClick={() => updateNotif({ delayHours: h })}
+                      <button key={h} onClick={() => updateNotif({ delayHours: h })}
                         className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                           notif.delayHours === h
                             ? 'bg-violet-600 text-white'
                             : 'border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                        }`}
-                      >
-                        {h}h
-                      </button>
+                        }`}>{h}h</button>
                     ))}
                   </div>
                 </div>
-
                 <div className="flex flex-col gap-1">
                   <p className="text-xs text-gray-400 dark:text-gray-500">Feed type to watch</p>
                   <div className="flex gap-2 flex-wrap">
                     {FILTER_OPTIONS.map(o => (
-                      <button
-                        key={o.value}
-                        onClick={() => updateNotif({ feedFilter: o.value })}
+                      <button key={o.value} onClick={() => updateNotif({ feedFilter: o.value })}
                         className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                           notif.feedFilter === o.value
                             ? 'bg-violet-600 text-white'
                             : 'border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                        }`}
-                      >
-                        {o.label}
-                      </button>
+                        }`}>{o.label}</button>
                     ))}
                   </div>
                 </div>
@@ -210,15 +250,13 @@ export default function Settings({ onNotifSettingsChanged }) {
             )}
           </>
         )}
-
-        <p className="text-xs text-gray-400 dark:text-gray-500">
-          Only fires while the app is open. No push server involved.
-        </p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">Only fires while the app is open. No push server involved.</p>
       </div>
 
       <hr className="border-gray-100 dark:border-gray-800" />
 
-      <div className="flex flex-col gap-2">
+      {/* Data backup */}
+      <div className="flex flex-col gap-3">
         <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Data backup</p>
         <button
           onClick={exportJSON}
@@ -230,6 +268,40 @@ export default function Settings({ onNotifSettingsChanged }) {
           All data lives in this browser only. Export regularly as your backup.
         </p>
       </div>
+
+      <hr className="border-gray-100 dark:border-gray-800" />
+
+      {/* Local snapshots */}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Local snapshots</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          The app automatically saves the last 10 snapshots here whenever you log something. Tap Restore to roll back to any of them — protects against accidental deletions or Firebase issues.
+        </p>
+        {snapshots.length === 0 ? (
+          <p className="text-xs text-gray-300 dark:text-gray-600">No snapshots yet — log something first.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {snapshots.map(s => (
+              <li key={s.index} className="flex items-center justify-between rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-2.5 shadow-sm">
+                <div>
+                  <p className="text-sm text-gray-700 dark:text-gray-200">
+                    {new Date(s.savedAt).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">{s.count} entries</p>
+                </div>
+                <button
+                  onClick={() => handleRestore(s.index)}
+                  disabled={restoring != null}
+                  className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 transition"
+                >
+                  {restoring === s.index ? 'Restoring…' : 'Restore'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
     </div>
   )
 }

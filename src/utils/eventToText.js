@@ -1,3 +1,6 @@
+// eventToText: returns the descriptive part only — the type badge in the UI already
+// shows the event type, so we don't repeat it here.
+
 export function eventToText(event) {
   const time = formatTime(event.timestamp_start)
   const d = event.data ?? {}
@@ -17,35 +20,35 @@ export function eventToText(event) {
       } else {
         source = 'bottle'
       }
-      return `Fed · ${source}${vol}${dur}${side} · ${time}`
+      return `${source}${vol}${dur}${side} · ${time}`
     }
     case 'pumping': {
-      const vol = d.volume_ml != null ? ` ${d.volume_ml}ml` : ''
+      const vol = d.volume_ml != null ? `${d.volume_ml}ml` : ''
       const dur = d.duration_min != null ? ` for ${d.duration_min} min` : ''
       const side = d.side && d.side !== 'null' ? ` (${d.side})` : ''
-      return `Pumping${vol}${dur}${side} · ${time}`
+      return `${vol}${dur}${side} · ${time}`.replace(/^\s*·/, '·').trim()
     }
     case 'sleep': {
       const end = event.timestamp_end ? ` → ${formatTime(event.timestamp_end)}` : ' (ongoing)'
-      return `Sleep · ${time}${end}`
+      return `${time}${end}`
     }
     case 'diaper': {
       const diaperLabel = { wet: 'pee', dirty: 'poo', both: 'pee + poo' }[d.kind] ?? d.kind ?? 'unknown'
-      return `Diaper · ${diaperLabel} · ${time}`
+      return `${diaperLabel} · ${time}`
     }
     case 'weight':
-      return `Weight · ${d.value} ${d.unit} · ${time}`
+      return `${d.value} ${d.unit} · ${time}`
     case 'temperature':
-      return `Temperature · ${d.value}°${d.unit} · ${time}`
+      return `${d.value}°${d.unit} · ${time}`
     case 'medication':
-      return `Medication · ${d.name}${d.dose ? ` ${d.dose}` : ''} · ${time}`
+      return `${d.name}${d.dose ? ` ${d.dose}` : ''} · ${time}`
     case 'milestone':
-      return `Milestone · ${d.label} · ${time}`
+      return `${d.label} · ${time}`
     case 'question_for_pediatrician':
-      return `Question for pediatrician · ${time}`
+      return time
     case 'note':
     default:
-      return `Note · ${time}`
+      return time
   }
 }
 
@@ -56,7 +59,6 @@ export const FIELD_LABELS = {
   volume_ml: 'volume (ml)',
   duration_min: 'duration (min)',
   milk_type: 'milk type',
-  // pumping shares volume_ml, duration_min, side
   side: 'side',
   kind: 'diaper type',
   value: 'value',

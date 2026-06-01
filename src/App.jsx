@@ -3,6 +3,7 @@ import { addRawEvent, replaceWithExtracted, getAllEvents, deleteEvent, updateEve
 import { extractEvents } from './api'
 import { scheduleCheck } from './notifications'
 import { syncPull, syncPush, syncDelete } from './sync'
+import { saveSnapshot } from './utils/snapshots'
 import LogInput from './components/LogInput'
 import EventList from './components/EventList'
 import EchoLoop from './components/EchoLoop'
@@ -30,12 +31,13 @@ export default function App() {
 
   useEffect(() => {
     async function init() {
-      // Pull remote events first, upsert into local DB, then load all
-      const remote = await syncPull()
-      for (const ev of remote) await upsertEvent(ev)
+      const { events: remoteEvs, tombstoneIds } = await syncPull()
+      for (const ev of remoteEvs) await upsertEvent(ev)
+      for (const id of tombstoneIds) await deleteEvent(id).catch(() => {})
       const evs = await getAllEvents()
       setEvents(evs)
       scheduleCheck(evs)
+      saveSnapshot(evs)
     }
     init()
   }, [])
@@ -44,9 +46,11 @@ export default function App() {
   useEffect(() => {
     async function onVisible() {
       if (document.visibilityState !== 'visible') return
-      const remote = await syncPull()
-      if (remote.length > 0) {
-        for (const ev of remote) await upsertEvent(ev)
+      const { events: remoteEvs, tombstoneIds } = await syncPull()
+      let changed = tombstoneIds.length > 0 || remoteEvs.length > 0
+      for (const ev of remoteEvs) await upsertEvent(ev)
+      for (const id of tombstoneIds) await deleteEvent(id).catch(() => {})
+      if (changed) {
         await refreshEvents()
       } else {
         scheduleCheck(events)
@@ -77,7 +81,6 @@ export default function App() {
   }
 
   async function handleConfirm(confirmedEvents) {
-    // If any event closes the active sleep, update the existing record instead of creating a new one
     if (activeSleep) {
       const closer = confirmedEvents.find(e => e.closes_active_sleep && e.type === 'sleep')
       if (closer) {
@@ -86,7 +89,6 @@ export default function App() {
         if (remaining.length > 0) {
           await replaceWithExtracted(pendingId, remaining)
         } else {
-          // Nothing else to save — just delete the placeholder
           await deleteEvent(pendingId)
         }
         await refreshEvents()
@@ -127,6 +129,10 @@ export default function App() {
     await deleteEvent(id)
     setEvents(prev => prev.filter(e => e.id !== id))
     syncDelete(id)
+    // Save snapshot after deletion so we can recover it
+    const all = await getAllEvents()
+    saveSnapshot(all)
+    syncPush(all)
   }
 
   async function handleEdit(id, patch) {
@@ -138,7 +144,13 @@ export default function App() {
     const all = await getAllEvents()
     setEvents(all)
     scheduleCheck(all)
+    saveSnapshot(all)
     syncPush(all)
+  }
+
+  async function handleRestore() {
+    await refreshEvents()
+    setTab('History')
   }
 
   return (
@@ -220,7 +232,10 @@ export default function App() {
         )}
 
         {phase === 'idle' && tab === 'Settings' && (
-          <Settings onNotifSettingsChanged={() => scheduleCheck(events)} />
+          <Settings
+            onNotifSettingsChanged={() => scheduleCheck(events)}
+            onRestore={handleRestore}
+          />
         )}
       </main>
     </div>

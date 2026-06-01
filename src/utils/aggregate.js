@@ -22,6 +22,7 @@ export function todayCounts(events) {
     feed: today.filter(e => e.type === 'feed').length,
     sleep: today.filter(e => e.type === 'sleep').length,
     diaper: today.filter(e => e.type === 'diaper').length,
+    pumping: today.filter(e => e.type === 'pumping').length,
   }
 }
 
@@ -42,6 +43,7 @@ export function dailySeries(events, days = 7) {
       key,
       label: day.toLocaleDateString([], { weekday: 'short' }),
       feeds: dayEvents.filter(e => e.type === 'feed').length,
+      pumpings: dayEvents.filter(e => e.type === 'pumping').length,
       // pee = wet-only + both; poo = dirty-only + both
       diapersPee: dayEvents.filter(e => isDiaper(e) && (e.data?.kind === 'wet' || e.data?.kind === 'both')).length,
       diapersPoo: dayEvents.filter(e => isDiaper(e) && (e.data?.kind === 'dirty' || e.data?.kind === 'both')).length,
@@ -61,6 +63,19 @@ function totalSleepHours(dayEvents) {
     }
   }
   return Math.round((ms / 3_600_000) * 10) / 10
+}
+
+// Returns all weight readings sorted oldest → newest (for plotting).
+export function weightSeries(events) {
+  return events
+    .filter(e => e.extracted && e.type === 'weight' && e.data?.value != null)
+    .sort((a, b) => (a.timestamp_start < b.timestamp_start ? -1 : 1))
+    .map(e => ({
+      key: e.id,
+      date: new Date(e.timestamp_start).toLocaleDateString([], { month: 'short', day: 'numeric' }),
+      value: Number(e.data.value),
+      unit: e.data.unit ?? 'kg',
+    }))
 }
 
 export function relativeTime(iso) {

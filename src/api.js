@@ -84,7 +84,7 @@ export async function extractEvents(rawText, activeSleepSince = null) {
       'content-type': 'application/json'
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: localStorage.getItem('anthropic_model') || 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userMessage }]
