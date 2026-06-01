@@ -102,15 +102,19 @@ function LastLine({ label, event }) {
 const TRACK_PX = 80
 const Y_TICKS = 3
 
-function YAxis({ max, unit = '' }) {
-  const ticks = Array.from({ length: Y_TICKS }, (_, i) =>
-    Math.round((max * (i / (Y_TICKS - 1))) * 10) / 10
-  ).reverse()
+// Tick positions as percentages from top: 0% = max, 50% = mid, 100% = 0
+const TICK_PCTS = [0, 50, 100]
 
+function YAxis({ max, unit = '' }) {
+  const ticks = [max, max / 2, 0].map(v => Math.round(v * 10) / 10)
   return (
-    <div className="flex flex-col justify-between pr-1 shrink-0" style={{ height: TRACK_PX }}>
+    <div className="relative pr-1 shrink-0" style={{ height: TRACK_PX, width: 28 }}>
       {ticks.map((v, i) => (
-        <span key={i} className="text-[9px] text-gray-300 dark:text-gray-600 leading-none text-right">
+        <span
+          key={i}
+          className="absolute right-1 text-[9px] text-gray-300 dark:text-gray-600 leading-none text-right -translate-y-1/2"
+          style={{ top: `${TICK_PCTS[i]}%` }}
+        >
           {v}{unit}
         </span>
       ))}
@@ -120,9 +124,13 @@ function YAxis({ max, unit = '' }) {
 
 function Gridlines() {
   return (
-    <div className="absolute inset-x-0 top-0 flex flex-col justify-between pointer-events-none" style={{ height: TRACK_PX }}>
-      {Array.from({ length: Y_TICKS }).map((_, i) => (
-        <div key={i} className="w-full border-t border-gray-100 dark:border-gray-800" />
+    <div className="absolute inset-x-0 top-0 pointer-events-none" style={{ height: TRACK_PX }}>
+      {TICK_PCTS.map(pct => (
+        <div
+          key={pct}
+          className="absolute w-full border-t border-gray-100 dark:border-gray-800"
+          style={{ top: `${pct}%` }}
+        />
       ))}
     </div>
   )
@@ -297,10 +305,16 @@ function WeightPlot({ weights }) {
 
   return (
     <div className="flex items-end gap-1">
-      <div className="flex flex-col justify-between pr-1 shrink-0 text-[9px] text-gray-300 dark:text-gray-600 text-right" style={{ height: TRACK_PX }}>
-        <span>{max}{unit}</span>
-        <span>{((max + min) / 2).toFixed(1)}{unit}</span>
-        <span>{min}{unit}</span>
+      <div className="relative pr-1 shrink-0" style={{ height: TRACK_PX, width: 32 }}>
+        {[max, ((max + min) / 2), min].map((v, i) => (
+          <span
+            key={i}
+            className="absolute right-1 text-[9px] text-gray-300 dark:text-gray-600 leading-none text-right -translate-y-1/2"
+            style={{ top: `${TICK_PCTS[i]}%` }}
+          >
+            {Number.isInteger(v) ? v : v.toFixed(1)}{unit}
+          </span>
+        ))}
       </div>
       <div className="flex-1 flex items-end gap-2">
         {weights.map(w => {
@@ -308,12 +322,7 @@ function WeightPlot({ weights }) {
           return (
             <div key={w.key} className="flex-1 flex flex-col items-center gap-1">
               <div className="relative w-full flex items-end justify-center" style={{ height: TRACK_PX }}>
-                {/* gridlines */}
-                <div className="absolute inset-x-0 top-0 flex flex-col justify-between pointer-events-none" style={{ height: TRACK_PX }}>
-                  <div className="w-full border-t border-gray-100 dark:border-gray-800" />
-                  <div className="w-full border-t border-gray-100 dark:border-gray-800" />
-                  <div className="w-full border-t border-gray-100 dark:border-gray-800" />
-                </div>
+                <Gridlines />
                 <div
                   className="relative w-full rounded-t bg-green-400 cursor-pointer hover:opacity-75 transition-opacity"
                   style={{ height: px }}

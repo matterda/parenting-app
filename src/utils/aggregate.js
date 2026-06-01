@@ -45,9 +45,9 @@ export function dailySeries(events, days = 7) {
       key,
       label: day.toLocaleDateString([], { weekday: 'short' }),
       feeds: feedEvents.length,
-      feedsVolumeMl: feedEvents.reduce((s, e) => s + (e.data?.volume_ml ?? 0), 0),
+      feedsVolumeMl: feedEvents.reduce((s, e) => s + (Number(e.data?.volume_ml) || 0), 0),
       pumpings: pumpEvents.length,
-      pumpingsVolumeMl: pumpEvents.reduce((s, e) => s + (e.data?.volume_ml ?? 0), 0),
+      pumpingsVolumeMl: pumpEvents.reduce((s, e) => s + (Number(e.data?.volume_ml) || 0), 0),
       // pee = wet-only + both; poo = dirty-only + both
       diapersPee: dayEvents.filter(e => isDiaper(e) && (e.data?.kind === 'wet' || e.data?.kind === 'both')).length,
       diapersPoo: dayEvents.filter(e => isDiaper(e) && (e.data?.kind === 'dirty' || e.data?.kind === 'both')).length,
