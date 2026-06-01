@@ -87,7 +87,12 @@ export async function extractEvents(rawText, activeSleepSince = null) {
       model: localStorage.getItem('anthropic_model') || 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userMessage }]
+      messages: [
+        { role: 'user', content: userMessage },
+        // Prefill the assistant turn — forces the model to continue as JSON
+        // instead of opening with a markdown fence or prose.
+        { role: 'assistant', content: '{' }
+      ]
     })
   })
 
@@ -97,12 +102,17 @@ export async function extractEvents(rawText, activeSleepSince = null) {
   }
 
   const body = await response.json()
-  const text = body.content?.[0]?.text ?? ''
+  // The response is the continuation after our '{' prefill, so prepend it back.
+  const raw = '{' + (body.content?.[0]?.text ?? '')
+
+  // Strip markdown fences as a fallback safety net (e.g. if the model wraps
+  // the JSON in ```json ... ``` despite the prefill).
+  const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
 
   try {
     return JSON.parse(text)
   } catch {
-    throw new Error('Claude returned non-JSON. Raw: ' + text.slice(0, 200))
+    throw new Error('Could not parse model response. Raw: ' + text.slice(0, 200))
   }
 }
 
