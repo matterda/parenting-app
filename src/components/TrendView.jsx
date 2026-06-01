@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { lastOfType, todayCounts, dailySeries, relativeTime, weightSeries } from '../utils/aggregate'
 import { eventToText } from '../utils/eventToText'
+import TimelineView from './TimelineView'
 
 export default function TrendView({ events }) {
   const hasData = events.some(e => e.extracted)
@@ -67,6 +68,11 @@ export default function TrendView({ events }) {
           <WeightPlot weights={weights} />
         </section>
       )}
+
+      {/* Timeline / Gantt */}
+      <section className="flex flex-col gap-3">
+        <TimelineView events={events} />
+      </section>
     </div>
   )
 }
