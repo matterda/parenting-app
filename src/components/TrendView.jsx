@@ -157,9 +157,9 @@ function GroupedBarRow({ title, series, fieldA, labelA, colorA, fieldB, labelB, 
           </span>
         </span>
       </div>
-      <div className="flex items-end gap-1">
+      <div className="flex items-start gap-1">
         <YAxis max={maxA} unit={unitA} />
-        <div className="flex-1 flex items-end gap-2">
+        <div className="flex-1 flex items-start gap-2">
           {series.map(d => {
             const valA = d[fieldA]
             const valB = d[fieldB]
@@ -215,7 +215,7 @@ function BarRow({ title, series, field, color, unit }) {
       <div className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">{title}</div>
       <div className="flex items-end gap-1">
         <YAxis max={max} unit={unit} />
-        <div className="flex-1 flex items-end gap-2">
+        <div className="flex-1 flex items-start gap-2">
           {series.map(d => {
             const val = d[field]
             const px = val > 0 ? Math.max((val / max) * TRACK_PX, 4) : 0
@@ -262,7 +262,7 @@ function StackedBarRow({ title, series }) {
       </div>
       <div className="flex items-end gap-1">
         <YAxis max={max} />
-        <div className="flex-1 flex items-end gap-2">
+        <div className="flex-1 flex items-start gap-2">
           {series.map(d => {
             const total = d.diapersPee + d.diapersPoo
             const peePx = d.diapersPee > 0 ? Math.max((d.diapersPee / max) * TRACK_PX, 4) : 0
@@ -304,19 +304,19 @@ function WeightPlot({ weights }) {
   const unit = weights[weights.length - 1]?.unit ?? 'kg'
 
   return (
-    <div className="flex items-end gap-1">
-      <div className="relative pr-1 shrink-0" style={{ height: TRACK_PX, width: 32 }}>
+    <div className="flex items-start gap-1">
+      <div className="relative pr-1 shrink-0" style={{ height: TRACK_PX, width: 36 }}>
         {[max, ((max + min) / 2), min].map((v, i) => (
           <span
             key={i}
             className="absolute right-1 text-[9px] text-gray-300 dark:text-gray-600 leading-none text-right -translate-y-1/2"
             style={{ top: `${TICK_PCTS[i]}%` }}
           >
-            {Number.isInteger(v) ? v : v.toFixed(1)}{unit}
+            {v.toFixed(2)}{unit}
           </span>
         ))}
       </div>
-      <div className="flex-1 flex items-end gap-2">
+      <div className="flex-1 flex items-start gap-2">
         {weights.map(w => {
           const px = Math.max(((w.value - min) / range) * (TRACK_PX - 12) + 12, 8)
           return (
