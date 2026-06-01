@@ -71,7 +71,7 @@ export async function deleteEvent(id) {
 export async function getAllEvents() {
   const db = await getDB()
   const all = await db.getAll(STORE)
-  return all.sort((a, b) => (a.timestamp_start < b.timestamp_start ? 1 : -1))
+  return all.sort((a, b) => new Date(b.timestamp_start).getTime() - new Date(a.timestamp_start).getTime())
 }
 
 export async function clearAllEvents() {
