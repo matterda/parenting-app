@@ -213,7 +213,7 @@ function BarRow({ title, series, field, color, unit }) {
   return (
     <div>
       <div className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">{title}</div>
-      <div className="flex items-end gap-1">
+      <div className="flex items-start gap-1">
         <YAxis max={max} unit={unit} />
         <div className="flex-1 flex items-start gap-2">
           {series.map(d => {
@@ -260,7 +260,7 @@ function StackedBarRow({ title, series }) {
           <span className="inline-block w-2 h-2 rounded-sm bg-amber-700 ml-1" /> poo
         </span>
       </div>
-      <div className="flex items-end gap-1">
+      <div className="flex items-start gap-1">
         <YAxis max={max} />
         <div className="flex-1 flex items-start gap-2">
           {series.map(d => {
