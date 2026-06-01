@@ -12,8 +12,9 @@ import TrendView from './components/TrendView'
 import Settings from './components/Settings'
 import ActiveSleepBanner, { LastSleepBanner } from './components/ActiveSleepBanner'
 import FeedOverdueBanner from './components/FeedOverdueBanner'
+import ReportView from './components/ReportView'
 
-const TABS = ['Log', 'History', 'Trends', 'Settings']
+const TABS = ['Log', 'History', 'Trends', 'Report', 'Settings']
 
 function getActiveSleep(events) {
   return events.find(e => e.extracted && e.type === 'sleep' && !e.timestamp_end) ?? null
@@ -238,6 +239,10 @@ export default function App() {
 
         {phase === 'idle' && tab === 'Trends' && (
           <TrendView events={events} />
+        )}
+
+        {phase === 'idle' && tab === 'Report' && (
+          <ReportView events={events} />
         )}
 
         {phase === 'idle' && tab === 'Settings' && (

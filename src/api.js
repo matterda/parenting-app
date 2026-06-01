@@ -1,6 +1,8 @@
-const BABY = {
-  name: 'baby name',
-  date_of_birth: '2025-01-01' // placeholder — update with real DOB
+function getBaby() {
+  return {
+    name: localStorage.getItem('baby_name') || 'baby',
+    date_of_birth: localStorage.getItem('baby_dob') || null,
+  }
 }
 
 const SYSTEM_PROMPT = `You convert a parent's free-text or dictated note about their baby into structured log events.
@@ -70,7 +72,7 @@ export async function extractEvents(rawText, activeSleepSince = null) {
   const userMessage = JSON.stringify({
     current_datetime,
     timezone,
-    baby: BABY,
+    baby: getBaby(),
     active_sleep_since: activeSleepSince,
     note: rawText
   })
