@@ -68,7 +68,12 @@ function EventCard({ event, onFieldChange }) {
     <div className={`rounded-xl border bg-white dark:bg-gray-900 p-4 shadow-sm ${
       event.confidence === 'low' ? 'border-amber-300 dark:border-amber-700' : 'border-gray-100 dark:border-gray-800'
     }`}>
-      <p className="font-medium text-gray-800 dark:text-gray-100 text-sm">{eventToText(event)}</p>
+      <div className="flex items-start gap-2">
+        <span className="shrink-0 rounded-md bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
+          {event.type}
+        </span>
+        <p className="font-medium text-gray-800 dark:text-gray-100 text-sm">{eventToText(event)}</p>
+      </div>
 
       {event.context_note && (
         <p className="mt-1 text-xs text-gray-400 dark:text-gray-500 italic">"{event.context_note}"</p>
