@@ -312,7 +312,7 @@ function WeightPlot({ weights }) {
             className="absolute right-1 text-[9px] text-gray-300 dark:text-gray-600 leading-none text-right -translate-y-1/2"
             style={{ top: `${TICK_PCTS[i]}%` }}
           >
-            {v.toFixed(2)}kg
+            {Math.round(v * 1000)}g
           </span>
         ))}
       </div>
