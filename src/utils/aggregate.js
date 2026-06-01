@@ -69,17 +69,25 @@ function totalSleepHours(dayEvents) {
   return Math.round((ms / 3_600_000) * 10) / 10
 }
 
+const TO_KG = { kg: 1, g: 0.001, lb: 0.453592, oz: 0.028350 }
+
 // Returns all weight readings sorted oldest → newest (for plotting).
+// valueKg normalises to kg for bar scaling; value+unit are kept for display.
 export function weightSeries(events) {
   return events
     .filter(e => e.extracted && e.type === 'weight' && e.data?.value != null)
     .sort((a, b) => (a.timestamp_start < b.timestamp_start ? -1 : 1))
-    .map(e => ({
-      key: e.id,
-      date: new Date(e.timestamp_start).toLocaleDateString([], { month: 'short', day: 'numeric' }),
-      value: Number(e.data.value),
-      unit: e.data.unit ?? 'kg',
-    }))
+    .map(e => {
+      const unit = e.data.unit ?? 'kg'
+      const value = Number(e.data.value)
+      return {
+        key: e.id,
+        date: new Date(e.timestamp_start).toLocaleDateString([], { month: 'short', day: 'numeric' }),
+        value,
+        unit,
+        valueKg: value * (TO_KG[unit] ?? 1),
+      }
+    })
 }
 
 export function relativeTime(iso) {

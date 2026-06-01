@@ -297,28 +297,28 @@ function StackedBarRow({ title, series }) {
 // ─── WeightPlot ───────────────────────────────────────────────────────────────
 function WeightPlot({ weights }) {
   const [tooltip, setTooltip] = useState(null)
-  const values = weights.map(w => w.value)
-  const min = Math.min(...values)
-  const max = Math.max(...values)
+  // Scale by kg-normalised values so 3000g and 3kg plot at the same height
+  const kgValues = weights.map(w => w.valueKg)
+  const min   = Math.min(...kgValues)
+  const max   = Math.max(...kgValues)
   const range = max - min || 1
-  const unit = weights[weights.length - 1]?.unit ?? 'kg'
 
   return (
     <div className="flex items-start gap-1">
-      <div className="relative pr-1 shrink-0" style={{ height: TRACK_PX, width: 36 }}>
-        {[max, ((max + min) / 2), min].map((v, i) => (
+      <div className="relative pr-1 shrink-0" style={{ height: TRACK_PX, width: 40 }}>
+        {[max, (max + min) / 2, min].map((v, i) => (
           <span
             key={i}
             className="absolute right-1 text-[9px] text-gray-300 dark:text-gray-600 leading-none text-right -translate-y-1/2"
             style={{ top: `${TICK_PCTS[i]}%` }}
           >
-            {v.toFixed(2)}{unit}
+            {v.toFixed(2)}kg
           </span>
         ))}
       </div>
       <div className="flex-1 flex items-start gap-2">
         {weights.map(w => {
-          const px = Math.max(((w.value - min) / range) * (TRACK_PX - 12) + 12, 8)
+          const px = Math.max(((w.valueKg - min) / range) * (TRACK_PX - 12) + 12, 8)
           return (
             <div key={w.key} className="flex-1 flex flex-col items-center gap-1">
               <div className="relative w-full flex items-end justify-center" style={{ height: TRACK_PX }}>
@@ -335,7 +335,7 @@ function WeightPlot({ weights }) {
                   )}
                 </div>
               </div>
-              <div className="text-[10px] text-gray-500 dark:text-gray-400">{w.value}</div>
+              <div className="text-[10px] text-gray-500 dark:text-gray-400">{w.value}{w.unit}</div>
               <div className="text-[10px] text-gray-300 dark:text-gray-600">{w.date}</div>
             </div>
           )
