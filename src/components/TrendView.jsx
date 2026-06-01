@@ -42,8 +42,20 @@ export default function TrendView({ events }) {
       {/* 7-day bars */}
       <section className="flex flex-col gap-5">
         <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Last 7 days</h2>
-        <BarRow title="Feeds / day" series={series} field="feeds" color="bg-blue-400" unit="" />
-        <BarRow title="Pumping sessions / day" series={series} field="pumpings" color="bg-rose-400" unit="" />
+        <GroupedBarRow
+          title="Feeds / day"
+          series={series}
+          fieldA="feeds" labelA="count" colorA="bg-blue-400"
+          fieldB="feedsVolumeMl" labelB="ml" colorB="bg-blue-200 dark:bg-blue-800"
+          unitB="ml"
+        />
+        <GroupedBarRow
+          title="Pumping / day"
+          series={series}
+          fieldA="pumpings" labelA="count" colorA="bg-rose-400"
+          fieldB="pumpingsVolumeMl" labelB="ml" colorB="bg-rose-200 dark:bg-rose-800"
+          unitB="ml"
+        />
         <BarRow title="Total sleep (hrs)" series={series} field="sleepHours" color="bg-indigo-400" unit="h" />
         <StackedBarRow title="Diapers / day" series={series} />
       </section>
@@ -112,6 +124,75 @@ function Gridlines() {
       {Array.from({ length: Y_TICKS }).map((_, i) => (
         <div key={i} className="w-full border-t border-gray-100 dark:border-gray-800" />
       ))}
+    </div>
+  )
+}
+
+// ─── GroupedBarRow ────────────────────────────────────────────────────────────
+// Two side-by-side bars per day: fieldA (e.g. count) and fieldB (e.g. total ml).
+// Each has its own scale so small counts and large ml values are both visible.
+function GroupedBarRow({ title, series, fieldA, labelA, colorA, fieldB, labelB, colorB, unitA = '', unitB = '' }) {
+  const [tooltip, setTooltip] = useState(null)
+  const maxA = Math.max(...series.map(d => d[fieldA]), 1)
+  const maxB = Math.max(...series.map(d => d[fieldB]), 1)
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-1.5">
+        <span className="text-xs text-gray-400 dark:text-gray-500">{title}</span>
+        <span className="flex items-center gap-2 text-[10px] text-gray-400 dark:text-gray-500">
+          <span className="flex items-center gap-1">
+            <span className={`inline-block w-2 h-2 rounded-sm ${colorA}`} />{labelA}
+          </span>
+          <span className="flex items-center gap-1">
+            <span className={`inline-block w-2 h-2 rounded-sm ${colorB}`} />{labelB}
+          </span>
+        </span>
+      </div>
+      <div className="flex items-end gap-1">
+        <YAxis max={maxA} unit={unitA} />
+        <div className="flex-1 flex items-end gap-2">
+          {series.map(d => {
+            const valA = d[fieldA]
+            const valB = d[fieldB]
+            const pxA = valA > 0 ? Math.max((valA / maxA) * TRACK_PX, 4) : 0
+            const pxB = valB > 0 ? Math.max((valB / maxB) * TRACK_PX, 4) : 0
+            const key = d.key
+            return (
+              <div key={key} className="flex-1 flex flex-col items-center gap-1">
+                <div className="relative w-full flex items-end gap-0.5" style={{ height: TRACK_PX }}>
+                  <Gridlines />
+                  {/* Bar A */}
+                  <div
+                    className={`relative flex-1 rounded-t ${colorA} cursor-pointer hover:opacity-75 transition-opacity`}
+                    style={{ height: pxA }}
+                    onClick={() => setTooltip(tooltip === key + 'a' ? null : key + 'a')}
+                  >
+                    {tooltip === key + 'a' && (
+                      <div className="absolute -top-6 left-1/2 -translate-x-1/2 rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-1.5 py-0.5 whitespace-nowrap z-10 shadow">
+                        {valA}{unitA}
+                      </div>
+                    )}
+                  </div>
+                  {/* Bar B */}
+                  <div
+                    className={`relative flex-1 rounded-t ${colorB} cursor-pointer hover:opacity-75 transition-opacity`}
+                    style={{ height: pxB }}
+                    onClick={() => setTooltip(tooltip === key + 'b' ? null : key + 'b')}
+                  >
+                    {tooltip === key + 'b' && (
+                      <div className="absolute -top-6 left-1/2 -translate-x-1/2 rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-1.5 py-0.5 whitespace-nowrap z-10 shadow">
+                        {valB}{unitB}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="text-[10px] text-gray-300 dark:text-gray-600">{d.label}</div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
