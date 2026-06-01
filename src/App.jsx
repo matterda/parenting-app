@@ -107,10 +107,25 @@ export default function App() {
     setTab('History')
   }
 
-  function handleReject() {
-    const text = pendingText
+  // Re-run extraction with edited note text (keeps same placeholder ID)
+  async function handleReextract(newText) {
+    setPendingText(newText)
+    setPhase('extracting')
+    try {
+      const result = await extractEvents(newText, activeSleep?.timestamp_start ?? null)
+      setExtracted(result)
+      setPhase('confirming')
+    } catch (err) {
+      setErrorMsg(err.message)
+      setPhase('error')
+    }
+  }
+
+  // Delete the pending placeholder and return to Log tab cleanly
+  async function handleDeletePending() {
+    await deleteEvent(pendingId)
+    syncDelete(pendingId)
     reset()
-    setPrefilledText(text)
     setTab('Log')
   }
 
@@ -190,9 +205,11 @@ export default function App() {
         {phase === 'confirming' && extracted && (
           <EchoLoop
             events={extracted.events}
+            rawText={pendingText}
             adviceRequested={extracted.advice_requested}
             onConfirm={handleConfirm}
-            onReject={handleReject}
+            onReextract={handleReextract}
+            onDelete={handleDeletePending}
           />
         )}
 

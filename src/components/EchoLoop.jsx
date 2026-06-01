@@ -1,15 +1,16 @@
 import { useState } from 'react'
 import { eventToText, FIELD_LABELS } from '../utils/eventToText'
 
-export default function EchoLoop({ events, adviceRequested, onConfirm, onReject }) {
+export default function EchoLoop({ events, rawText, adviceRequested, onConfirm, onReextract, onDelete }) {
   const [edits, setEdits] = useState(() =>
     events.map(ev => ({ ...ev, data: { ...(ev.data ?? {}) } }))
   )
+  const [fixing, setFixing] = useState(false)
+  const [fixText, setFixText] = useState(rawText ?? '')
 
   function updateField(evIndex, field, value) {
     setEdits(prev => {
       const next = prev.map((ev, i) => i === evIndex ? { ...ev, data: { ...ev.data } } : ev)
-      // timestamp fields live on the event root, data fields live in ev.data
       if (field === 'timestamp_start' || field === 'timestamp_end') {
         next[evIndex] = { ...next[evIndex], [field]: toISO(next[evIndex][field], value) }
       } else {
@@ -40,20 +41,55 @@ export default function EchoLoop({ events, adviceRequested, onConfirm, onReject 
         </div>
       )}
 
-      <div className="flex gap-3 pt-1">
-        <button
-          onClick={() => onConfirm(edits)}
-          className="flex-1 rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 transition"
-        >
-          Looks right ✓
-        </button>
-        <button
-          onClick={onReject}
-          className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
-        >
-          Fix note
-        </button>
-      </div>
+      {fixing ? (
+        /* ── inline note editor ── */
+        <div className="flex flex-col gap-2 rounded-xl border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950 p-4">
+          <p className="text-xs font-medium text-violet-700 dark:text-violet-300">Edit your note and re-extract:</p>
+          <textarea
+            className="w-full rounded-lg border border-violet-200 dark:border-violet-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-violet-400 resize-none"
+            rows={3}
+            value={fixText}
+            onChange={e => setFixText(e.target.value)}
+            autoFocus
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => { if (fixText.trim()) onReextract(fixText.trim()) }}
+              disabled={!fixText.trim()}
+              className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-40 transition"
+            >
+              Re-extract
+            </button>
+            <button
+              onClick={() => setFixing(false)}
+              className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={() => onConfirm(edits)}
+            className="flex-1 rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 transition"
+          >
+            Looks right ✓
+          </button>
+          <button
+            onClick={() => setFixing(true)}
+            className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+          >
+            Fix note
+          </button>
+          <button
+            onClick={onDelete}
+            className="rounded-xl border border-red-200 dark:border-red-900 bg-white dark:bg-gray-900 px-4 py-3 text-sm font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition"
+          >
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   )
 }
