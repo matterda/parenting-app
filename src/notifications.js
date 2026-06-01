@@ -48,7 +48,17 @@ export function getFeedOverdueStatus(events) {
   const sinceMin = Math.round((Date.now() - new Date(last.timestamp_start).getTime()) / 60000)
   const overdue = sinceMin >= settings.delayHours * 60
 
-  return { overdue, sinceMin, lastFeed: last }
+  return { overdue, sinceMin, lastFeed: last, milkType: milkLabel(last) }
+}
+
+// Human-readable milk type label for a feed event.
+export function milkLabel(feedEvent) {
+  const mt = feedEvent?.data?.milk_type
+  if (!mt) return null
+  if (mt === 'breast_milk') return 'breast milk'
+  if (mt === 'formula')     return 'formula'
+  if (mt === 'mixed')       return 'mixed'
+  return mt
 }
 
 // ─── OS notification scheduling ──────────────────────────────────────────────
@@ -77,7 +87,7 @@ export function scheduleCheck(events) {
     // Overdue — fire once per feed event (don't repeat on every scheduleCheck call)
     if (_notifiedForFeedId !== last.id) {
       _notifiedForFeedId = last.id
-      fireNotification(settings.delayHours)
+      fireNotification(settings.delayHours, milkLabel(last))
     }
     return
   }
@@ -86,14 +96,15 @@ export function scheduleCheck(events) {
   _notifiedForFeedId = null
   _scheduledTimeout = setTimeout(() => {
     _notifiedForFeedId = last.id
-    fireNotification(settings.delayHours)
+    fireNotification(settings.delayHours, milkLabel(last))
   }, msUntilDue)
 }
 
-function fireNotification(delayHours) {
+function fireNotification(delayHours, milk) {
+  const feedDesc = milk ? `last ${milk} feed` : 'last feed'
   try {
     new Notification('Baby Log — Feed reminder', {
-      body: `It's been ${delayHours}h since the last feed. Time to check in!`,
+      body: `It's been ${delayHours}h since the ${feedDesc}. Time to check in!`,
       icon: './icon-192.png',
       tag: 'feed-reminder',
     })
