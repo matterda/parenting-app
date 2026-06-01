@@ -1,5 +1,4 @@
-// Feed reminder notifications.
-// Only works while the PWA is open (no push server).
+// Feed reminder notifications + overdue status for the in-app banner.
 
 export function getNotifSettings() {
   try {
@@ -31,15 +30,32 @@ function feedMatchesFilter(ev, filter) {
   return true
 }
 
-// Find the most recent feed matching the filter
 function lastMatchingFeed(events, filter) {
-  const feeds = events
+  return events
     .filter(e => e.extracted && e.type === 'feed' && feedMatchesFilter(e, filter))
-    .sort((a, b) => (a.timestamp_start < b.timestamp_start ? 1 : -1))
-  return feeds[0] ?? null
+    .sort((a, b) => new Date(b.timestamp_start) - new Date(a.timestamp_start))[0] ?? null
 }
 
+// Returns overdue info for the in-app banner.
+// { overdue: bool, sinceMin: number, lastFeed: event|null }
+export function getFeedOverdueStatus(events) {
+  const settings = getNotifSettings()
+  if (!settings.enabled) return { overdue: false, sinceMin: 0, lastFeed: null }
+
+  const last = lastMatchingFeed(events, settings.feedFilter)
+  if (!last) return { overdue: false, sinceMin: 0, lastFeed: null }
+
+  const sinceMin = Math.round((Date.now() - new Date(last.timestamp_start).getTime()) / 60000)
+  const overdue = sinceMin >= settings.delayHours * 60
+
+  return { overdue, sinceMin, lastFeed: last }
+}
+
+// ─── OS notification scheduling ──────────────────────────────────────────────
+// Tracks the feed ID for which a notification was last fired, to avoid
+// re-firing the same overdue notification on every scheduleCheck call.
 let _scheduledTimeout = null
+let _notifiedForFeedId = null
 
 export function scheduleCheck(events) {
   const settings = getNotifSettings()
@@ -58,12 +74,18 @@ export function scheduleCheck(events) {
   const msUntilDue = dueAt - Date.now()
 
   if (msUntilDue <= 0) {
-    // Already overdue — fire immediately (once)
-    fireNotification(settings.delayHours)
+    // Overdue — fire once per feed event (don't repeat on every scheduleCheck call)
+    if (_notifiedForFeedId !== last.id) {
+      _notifiedForFeedId = last.id
+      fireNotification(settings.delayHours)
+    }
     return
   }
 
+  // Not yet due — schedule for when it becomes due
+  _notifiedForFeedId = null
   _scheduledTimeout = setTimeout(() => {
+    _notifiedForFeedId = last.id
     fireNotification(settings.delayHours)
   }, msUntilDue)
 }
@@ -73,7 +95,7 @@ function fireNotification(delayHours) {
     new Notification('Baby Log — Feed reminder', {
       body: `It's been ${delayHours}h since the last feed. Time to check in!`,
       icon: './icon-192.png',
-      tag: 'feed-reminder', // replaces any previous reminder
+      tag: 'feed-reminder',
     })
   } catch (e) {
     console.warn('Notification failed:', e)

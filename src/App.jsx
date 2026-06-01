@@ -11,6 +11,7 @@ import EchoLoop from './components/EchoLoop'
 import TrendView from './components/TrendView'
 import Settings from './components/Settings'
 import ActiveSleepBanner, { LastSleepBanner } from './components/ActiveSleepBanner'
+import FeedOverdueBanner from './components/FeedOverdueBanner'
 
 const TABS = ['Log', 'History', 'Trends', 'Settings']
 
@@ -223,6 +224,7 @@ export default function App() {
                 ? <LastSleepBanner lastSleep={lastSleep} />
                 : null
             })()}
+            <FeedOverdueBanner events={events} />
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Describe what happened in plain language. Tap the mic on your keyboard to dictate.
             </p>
