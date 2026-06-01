@@ -4,12 +4,13 @@ import { extractEvents } from './api'
 import { scheduleCheck } from './notifications'
 import { syncPull, syncPush, syncDelete } from './sync'
 import { saveSnapshot } from './utils/snapshots'
+import { lastOfType } from './utils/aggregate'
 import LogInput from './components/LogInput'
 import EventList from './components/EventList'
 import EchoLoop from './components/EchoLoop'
 import TrendView from './components/TrendView'
 import Settings from './components/Settings'
-import ActiveSleepBanner from './components/ActiveSleepBanner'
+import ActiveSleepBanner, { LastSleepBanner } from './components/ActiveSleepBanner'
 
 const TABS = ['Log', 'History', 'Trends', 'Settings']
 
@@ -216,6 +217,12 @@ export default function App() {
                 onMarkAwake={handleMarkAwake}
               />
             )}
+            {!activeSleep && (() => {
+              const lastSleep = lastOfType(events, 'sleep')
+              return lastSleep?.timestamp_end
+                ? <LastSleepBanner lastSleep={lastSleep} />
+                : null
+            })()}
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Describe what happened in plain language. Tap the mic on your keyboard to dictate.
             </p>

@@ -32,6 +32,30 @@ export default function ActiveSleepBanner({ since, onMarkAwake }) {
   )
 }
 
+// Shown in Log tab when baby is awake — time since last sleep ended
+export function LastSleepBanner({ lastSleep }) {
+  const [since, setSince] = useState(getElapsed(lastSleep.timestamp_end))
+
+  useEffect(() => {
+    const id = setInterval(() => setSince(getElapsed(lastSleep.timestamp_end)), 60000)
+    return () => clearInterval(id)
+  }, [lastSleep.timestamp_end])
+
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 flex items-center gap-3 shadow-sm">
+      <span className="text-lg">😴</span>
+      <div>
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+          Awake for {since}
+        </p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          Last sleep ended at {formatTime(lastSleep.timestamp_end)}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function getElapsed(since) {
   const mins = Math.round((Date.now() - new Date(since).getTime()) / 60000)
   if (mins < 60) return `${mins}m`
