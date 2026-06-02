@@ -49,7 +49,16 @@ export function getFeedOverdueStatus(events) {
   const sinceMin = Math.round((Date.now() - new Date(last.timestamp_start).getTime()) / 60000)
   const overdue = sinceMin >= settings.delayHours * 60
 
-  return { overdue, sinceMin, lastFeed: last, milkType: milkLabel(last) }
+  return { overdue, sinceMin, lastFeed: last, label: feedFilterLabel(settings.feedFilter) }
+}
+
+// Describes what the reminder is tracking, based on the chosen filter — used
+// for the banner/notification text (not the individual feed's milk type).
+export function feedFilterLabel(filter) {
+  if (filter === 'bottle')  return 'bottle'
+  if (filter === 'breast')  return 'breastfeed'
+  if (filter === 'formula') return 'formula feed'
+  return 'feed'
 }
 
 // Human-readable milk type label for a feed event.
@@ -84,6 +93,7 @@ export function scheduleCheck(events) {
   const last = lastMatchingFeed(events, settings.feedFilter)
   if (!last) return
 
+  const label = feedFilterLabel(settings.feedFilter)
   const dueAt = new Date(last.timestamp_start).getTime() + settings.delayHours * 3_600_000
   const msUntilDue = dueAt - Date.now()
 
@@ -91,7 +101,7 @@ export function scheduleCheck(events) {
     // Overdue — fire once per feed event (don't repeat on every scheduleCheck call)
     if (_notifiedForFeedId !== last.id) {
       _notifiedForFeedId = last.id
-      fireNotification(settings.delayHours, milkLabel(last))
+      fireNotification(settings.delayHours, label)
     }
     return
   }
@@ -100,12 +110,12 @@ export function scheduleCheck(events) {
   _notifiedForFeedId = null
   _scheduledTimeout = setTimeout(() => {
     _notifiedForFeedId = last.id
-    fireNotification(settings.delayHours, milkLabel(last))
+    fireNotification(settings.delayHours, label)
   }, msUntilDue)
 }
 
-function fireNotification(delayHours, milk) {
-  const feedDesc = milk ? `last ${milk} feed` : 'last feed'
+function fireNotification(delayHours, label) {
+  const feedDesc = `last ${label ?? 'feed'}`
   try {
     new Notification('Baby Log — Feed reminder', {
       body: `It's been ${delayHours}h since the ${feedDesc}. Time to check in!`,

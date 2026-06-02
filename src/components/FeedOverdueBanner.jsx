@@ -26,7 +26,7 @@ export default function FeedOverdueBanner({ events }) {
       <span className="text-xl shrink-0">🍼</span>
       <div>
         <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
-          Feed reminder — {elapsed} since last {status.milkType ?? 'feed'}
+          Feed reminder — {elapsed} since last {status.label ?? 'feed'}
         </p>
         <p className="text-xs text-amber-600 dark:text-amber-400">
           {new Date(status.lastFeed.timestamp_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
