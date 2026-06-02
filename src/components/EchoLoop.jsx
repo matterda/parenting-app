@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { eventToText, FIELD_LABELS } from '../utils/eventToText'
+import { toLocalISO } from '../utils/time'
 
 export default function EchoLoop({ events, rawText, adviceRequested, onConfirm, onReextract, onDelete }) {
   const [edits, setEdits] = useState(() =>
@@ -236,7 +237,7 @@ function toISO(existingISO, newTimeStr) {
     const [h, m] = newTimeStr.split(':').map(Number)
     if (isNaN(h)) return existingISO
     base.setHours(h, m ?? 0, 0, 0)
-    return base.toISOString()
+    return toLocalISO(base)
   } catch {
     return existingISO
   }

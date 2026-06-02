@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { toLocalISO } from '../utils/time'
 
 export default function EditEntry({ ev, onSave, onCancel }) {
   const [data, setData] = useState({ ...(ev.data ?? {}) })
@@ -18,9 +19,16 @@ export default function EditEntry({ ev, onSave, onCancel }) {
     } else {
       patch.data = data
       patch.context_note = contextNote.trim() || null
-      patch.timestamp_start = applyTimeInput(ev.timestamp_start, timeStart)
+      const start = applyTimeInput(ev.timestamp_start, timeStart)
+      patch.timestamp_start = start
       if (ev.timestamp_end != null) {
-        patch.timestamp_end = applyTimeInput(ev.timestamp_end, timeEnd)
+        let end = applyTimeInput(ev.timestamp_end, timeEnd)
+        // If the end lands before the start (e.g. a sleep crossing midnight),
+        // roll it forward a day so the duration stays positive.
+        if (new Date(end).getTime() < new Date(start).getTime()) {
+          end = toLocalISO(new Date(new Date(end).getTime() + 86_400_000))
+        }
+        patch.timestamp_end = end
       }
     }
     onSave(patch)
@@ -150,6 +158,6 @@ function applyTimeInput(existingISO, timeStr) {
     const d = new Date(existingISO)
     const [h, m] = timeStr.split(':').map(Number)
     d.setHours(h, m, 0, 0)
-    return d.toISOString()
+    return toLocalISO(d)
   } catch { return existingISO }
 }

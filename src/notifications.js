@@ -53,7 +53,10 @@ export function getFeedOverdueStatus(events) {
 
 // Human-readable milk type label for a feed event.
 export function milkLabel(feedEvent) {
-  const mt = feedEvent?.data?.milk_type
+  const d = feedEvent?.data ?? {}
+  // A direct breast feed often has milk_type null but is always breast milk.
+  if (d.method === 'breast') return 'breast milk'
+  const mt = d.milk_type
   if (!mt) return null
   if (mt === 'breast_milk') return 'breast milk'
   if (mt === 'formula')     return 'formula'

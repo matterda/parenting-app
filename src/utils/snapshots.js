@@ -24,20 +24,33 @@ function save(snapshots) {
   }
 }
 
+// Latest updated_at across all events — changes whenever any event is edited,
+// even if the count and newest id stay the same.
+function editSignature(events) {
+  let max = ''
+  for (const e of events) {
+    if (e.updated_at && e.updated_at > max) max = e.updated_at
+  }
+  return max
+}
+
 // Save the current events array as a new snapshot (auto-deduplicates if events
 // haven't changed since the last save).
 export function saveSnapshot(events) {
   if (!events || events.length === 0) return
   const snapshots = load()
+  const sig = editSignature(events)
 
-  // Skip if identical to the most recent snapshot (compare by count + last id)
+  // Skip if identical to the most recent snapshot. Count + newest id catch
+  // adds/deletes; the edit signature catches in-place edits.
   const last = snapshots[snapshots.length - 1]
-  if (last && last.count === events.length && last.lastId === events[0]?.id) return
+  if (last && last.count === events.length && last.lastId === events[0]?.id && last.sig === sig) return
 
   snapshots.push({
     savedAt: new Date().toISOString(),
     count: events.length,
     lastId: events[0]?.id ?? null, // events are reverse-chrono, so [0] is newest
+    sig,
     data: events,
   })
 
