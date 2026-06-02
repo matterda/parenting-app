@@ -112,7 +112,7 @@ function YAxis({ max, unit = '' }) {
       {ticks.map((v, i) => (
         <span
           key={i}
-          className="absolute right-1 text-[9px] text-gray-300 dark:text-gray-600 leading-none text-right -translate-y-1/2"
+          className="absolute right-1 text-[9px] text-gray-500 dark:text-gray-400 leading-none text-right -translate-y-1/2"
           style={{ top: `${TICK_PCTS[i]}%` }}
         >
           {v}{unit}
@@ -195,7 +195,7 @@ function GroupedBarRow({ title, series, fieldA, labelA, colorA, fieldB, labelB, 
                     )}
                   </div>
                 </div>
-                <div className="text-[10px] text-gray-300 dark:text-gray-600">{d.label}</div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400">{d.label}</div>
               </div>
             )
           })}
@@ -236,7 +236,7 @@ function BarRow({ title, series, field, color, unit }) {
                   </div>
                 </div>
                 <div className="text-[10px] text-gray-500 dark:text-gray-400">{val}{unit}</div>
-                <div className="text-[10px] text-gray-300 dark:text-gray-600">{d.label}</div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400">{d.label}</div>
               </div>
             )
           })}
@@ -265,8 +265,9 @@ function StackedBarRow({ title, series }) {
         <div className="flex-1 flex items-start gap-2">
           {series.map(d => {
             const total = d.diapersPee + d.diapersPoo
-            const peePx = d.diapersPee > 0 ? Math.max((d.diapersPee / max) * TRACK_PX, 4) : 0
-            const pooPx = d.diapersPoo > 0 ? Math.max((d.diapersPoo / max) * TRACK_PX, 4) : 0
+            // Strictly proportional so the stacked total matches the y-axis.
+            const peePx = (d.diapersPee / max) * TRACK_PX
+            const pooPx = (d.diapersPoo / max) * TRACK_PX
             return (
               <div key={d.key} className="flex-1 flex flex-col items-center gap-1">
                 <div
@@ -284,7 +285,7 @@ function StackedBarRow({ title, series }) {
                   )}
                 </div>
                 <div className="text-[10px] text-gray-500 dark:text-gray-400">{total}</div>
-                <div className="text-[10px] text-gray-300 dark:text-gray-600">{d.label}</div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400">{d.label}</div>
               </div>
             )
           })}
@@ -316,7 +317,9 @@ function FeedMilkBarRow({ title, series }) {
         <div className="flex-1 flex items-start gap-2">
           {series.map((d, i) => {
             const totalMl = d.feedsBreastMl + d.feedsFormulaMl + d.feedsOtherMl
-            const seg = v => (v > 0 ? Math.max((v / max) * TRACK_PX, 4) : 0)
+            // Strictly proportional — no per-segment min height, so the stacked
+            // total matches the y-axis scale exactly.
+            const seg = v => (v / max) * TRACK_PX
             // Anchor edge-day tooltips inward so they don't spill off-screen.
             const isFirst = i === 0
             const isLast = i === series.length - 1
@@ -341,7 +344,7 @@ function FeedMilkBarRow({ title, series }) {
                   )}
                 </div>
                 <div className="text-[10px] text-gray-500 dark:text-gray-400">{totalMl}ml</div>
-                <div className="text-[10px] text-gray-300 dark:text-gray-600">{d.label}</div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400">{d.label}</div>
               </div>
             )
           })}
@@ -366,7 +369,7 @@ function WeightPlot({ weights }) {
         {[max, (max + min) / 2, min].map((v, i) => (
           <span
             key={i}
-            className="absolute right-1 text-[9px] text-gray-300 dark:text-gray-600 leading-none text-right -translate-y-1/2"
+            className="absolute right-1 text-[9px] text-gray-500 dark:text-gray-400 leading-none text-right -translate-y-1/2"
             style={{ top: `${TICK_PCTS[i]}%` }}
           >
             {Math.round(v * 1000)}g
@@ -393,7 +396,7 @@ function WeightPlot({ weights }) {
                 </div>
               </div>
               <div className="text-[10px] text-gray-500 dark:text-gray-400">{w.value}{w.unit}</div>
-              <div className="text-[10px] text-gray-300 dark:text-gray-600">{w.date}</div>
+              <div className="text-[10px] text-gray-500 dark:text-gray-400">{w.date}</div>
             </div>
           )
         })}
