@@ -3,6 +3,13 @@ import { getAllEvents, clearAllEvents, upsertEvent } from '../db'
 import { getTheme, applyTheme } from '../theme'
 import { getNotifSettings, saveNotifSettings, requestPermission } from '../notifications'
 import { listSnapshots, getSnapshotData } from '../utils/snapshots'
+import {
+  listRestorePoints,
+  reconstructAt,
+  stateBeforeLastN,
+  exportLog,
+  getLogCount,
+} from '../utils/eventLog'
 
 const KEY = 'anthropic_api_key'
 const SYNC_KEY = 'firebase_sync_url'
@@ -35,6 +42,13 @@ export default function Settings({ onNotifSettingsChanged, onRestore }) {
   const [permState, setPermState] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'))
   const [snapshots, setSnapshots] = useState(listSnapshots)
   const [restoring, setRestoring] = useState(null)
+
+  // Operation-log recovery
+  const [logOpen, setLogOpen] = useState(false)
+  const [logPoints, setLogPoints] = useState([])
+  const [logCount, setLogCount] = useState(null)
+  const [logBusy, setLogBusy] = useState(false)
+  const [undoN, setUndoN] = useState(1)
 
   function saveBaby() {
     localStorage.setItem(BABY_NAME_KEY, babyName.trim())
@@ -105,6 +119,63 @@ export default function Settings({ onNotifSettingsChanged, onRestore }) {
     onRestore?.()
     setRestoring(null)
     setSnapshots(listSnapshots())
+  }
+
+  // ── Operation-log recovery ──────────────────────────────────────────────
+  async function toggleLog() {
+    const next = !logOpen
+    setLogOpen(next)
+    if (next) {
+      const [points, count] = await Promise.all([listRestorePoints(), getLogCount()])
+      setLogPoints(points)
+      setLogCount(count)
+    }
+  }
+
+  // Replace all live events with the given reconstructed set.
+  async function applyState(events) {
+    await clearAllEvents()
+    for (const ev of events) await upsertEvent(ev)
+    onRestore?.()
+    setSnapshots(listSnapshots())
+    const [points, count] = await Promise.all([listRestorePoints(), getLogCount()])
+    setLogPoints(points)
+    setLogCount(count)
+  }
+
+  async function handleTimeTravel(seq) {
+    if (logBusy) return
+    if (!window.confirm(`Restore data to its state at this point (seq ${seq})? Current data will be replaced.`)) return
+    setLogBusy(true)
+    try {
+      const events = await reconstructAt(seq)
+      await applyState(events)
+    } finally {
+      setLogBusy(false)
+    }
+  }
+
+  async function handleUndo() {
+    if (logBusy) return
+    if (!window.confirm(`Undo the last ${undoN} operation${undoN > 1 ? 's' : ''}? Current data will be replaced.`)) return
+    setLogBusy(true)
+    try {
+      const events = await stateBeforeLastN(undoN)
+      await applyState(events)
+    } finally {
+      setLogBusy(false)
+    }
+  }
+
+  async function exportHistory() {
+    const json = await exportLog()
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `baby-log-history-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -348,6 +419,96 @@ export default function Settings({ onNotifSettingsChanged, onRestore }) {
               </li>
             ))}
           </ul>
+        )}
+      </div>
+
+      <hr className="border-gray-100 dark:border-gray-800" />
+
+      {/* Operation history & recovery */}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Operation history &amp; recovery</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          Every create, edit and delete is recorded in a local, append-only log that survives remote
+          database wipes. Use it to undo recent changes, roll back to any earlier point, or export the
+          full history for offsite backup.
+        </p>
+
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={exportHistory}
+            className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+          >
+            Export full history
+          </button>
+          <button
+            onClick={toggleLog}
+            className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+          >
+            {logOpen ? 'Hide audit log' : 'Inspect audit log'}
+          </button>
+        </div>
+
+        {/* Undo last N */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-gray-400 dark:text-gray-500">Undo last</span>
+          <input
+            type="number"
+            min="1"
+            value={undoN}
+            onChange={e => setUndoN(Math.max(1, Number(e.target.value) || 1))}
+            className="w-16 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+          />
+          <span className="text-xs text-gray-400 dark:text-gray-500">operation{undoN > 1 ? 's' : ''}</span>
+          <button
+            onClick={handleUndo}
+            disabled={logBusy}
+            className="rounded-lg bg-violet-600 px-4 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:opacity-40 transition"
+          >
+            {logBusy ? 'Working…' : 'Undo'}
+          </button>
+        </div>
+
+        {logOpen && (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              {logCount ?? 0} total operations. Tap a row to roll back to that point in time.
+            </p>
+            {logPoints.length === 0 ? (
+              <p className="text-xs text-gray-300 dark:text-gray-600">No operations logged yet.</p>
+            ) : (
+              <ul className="flex flex-col gap-1 max-h-80 overflow-y-auto">
+                {logPoints.map(p => (
+                  <li key={p.seq}>
+                    <button
+                      onClick={() => handleTimeTravel(p.seq)}
+                      disabled={logBusy}
+                      className="w-full flex items-center justify-between rounded-lg border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-2 text-left shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 transition"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs text-gray-700 dark:text-gray-200">
+                          <span className={`font-mono uppercase ${
+                            p.op === 'delete' ? 'text-red-500'
+                              : p.op === 'create' ? 'text-green-600 dark:text-green-400'
+                              : 'text-amber-600 dark:text-amber-400'
+                          }`}>{p.op}</span>
+                          {' '}
+                          <span className="text-gray-400 dark:text-gray-500">
+                            {p.source === 'sync' ? 'sync' : 'you'}
+                          </span>
+                        </p>
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                          {new Date(p.ts).toLocaleString()} · {p.count} entries
+                        </p>
+                      </div>
+                      <span className="text-[11px] text-gray-300 dark:text-gray-600 shrink-0 ml-2">
+                        #{p.seq}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
       </div>
 

@@ -1,16 +1,26 @@
 import { openDB } from 'idb'
 import { mergeEvent } from './utils/mergeEvent'
 import { serverNow } from './utils/serverTime'
+import { appendLog } from './utils/eventLog'
 
 const DB_NAME = 'baby-log'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const STORE = 'events'
+export const LOG_STORE = 'event_log'
 
-function getDB() {
+export function getDB() {
   return openDB(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      const store = db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true })
-      store.createIndex('timestamp_start', 'timestamp_start')
+    upgrade(db, oldVersion) {
+      if (oldVersion < 1) {
+        const store = db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true })
+        store.createIndex('timestamp_start', 'timestamp_start')
+      }
+      if (oldVersion < 2) {
+        // Append-only operation log — every create/update/delete is recorded
+        // here so the full history can be reconstructed even if the events
+        // store (or the remote DB) is wiped. seq is a monotonic local key.
+        db.createObjectStore(LOG_STORE, { keyPath: 'seq', autoIncrement: true })
+      }
     }
   })
 }
@@ -32,6 +42,7 @@ export async function addRawEvent(rawText) {
     updated_at: serverNow(),
   }
   await db.put(STORE, record)
+  await appendLog({ op: 'create', id: record.id, before: null, after: record, source: 'user' })
   return record
 }
 
@@ -48,6 +59,7 @@ function newId() {
 // Deletes the placeholder record and writes one record per extracted event.
 export async function replaceWithExtracted(placeholderId, confirmedEvents) {
   const db = await getDB()
+  const before = await db.get(STORE, placeholderId)
   const tx = db.transaction(STORE, 'readwrite')
   await tx.store.delete(placeholderId)
   const saved = []
@@ -57,6 +69,11 @@ export async function replaceWithExtracted(placeholderId, confirmedEvents) {
     saved.push(record)
   }
   await tx.done
+  // Log the placeholder removal then each extracted insert.
+  await appendLog({ op: 'delete', id: placeholderId, before: before ?? null, after: null, source: 'user' })
+  for (const record of saved) {
+    await appendLog({ op: 'create', id: record.id, before: null, after: record, source: 'user' })
+  }
   return saved
 }
 
@@ -64,7 +81,10 @@ export async function updateEvent(id, patch) {
   const db = await getDB()
   const existing = await db.get(STORE, id)
   if (!existing) throw new Error(`Event ${id} not found`)
-  return db.put(STORE, { ...existing, ...patch, updated_at: serverNow() })
+  const updated = { ...existing, ...patch, updated_at: serverNow() }
+  await db.put(STORE, updated)
+  await appendLog({ op: 'update', id, before: existing, after: updated, source: 'user' })
+  return updated
 }
 
 // Upsert: create if not present, otherwise field-level merge with the existing
@@ -78,16 +98,26 @@ export async function upsertEvent(ev) {
   const normEv = normId !== ev.id ? { ...ev, id: normId } : ev
   const existing = await db.get(STORE, normId)
   if (!existing) {
-    return db.put(STORE, normEv)
+    await db.put(STORE, normEv)
+    await appendLog({ op: 'create', id: normId, before: null, after: normEv, source: 'sync' })
+    return normEv
   }
   const merged = mergeEvent(existing, normEv)
   merged.id = normId
-  return db.put(STORE, merged)
+  await db.put(STORE, merged)
+  // Only log when the merge actually changed something, to avoid flooding the
+  // log with no-op sync writes.
+  if (JSON.stringify(merged) !== JSON.stringify(existing)) {
+    await appendLog({ op: 'update', id: normId, before: existing, after: merged, source: 'sync' })
+  }
+  return merged
 }
 
 export async function deleteEvent(id) {
   const db = await getDB()
-  return db.delete(STORE, id)
+  const before = await db.get(STORE, id)
+  await db.delete(STORE, id)
+  if (before) await appendLog({ op: 'delete', id, before, after: null, source: 'user' })
 }
 
 export async function getAllEvents() {
@@ -98,5 +128,9 @@ export async function getAllEvents() {
 
 export async function clearAllEvents() {
   const db = await getDB()
-  return db.clear(STORE)
+  const all = await db.getAll(STORE)
+  await db.clear(STORE)
+  for (const ev of all) {
+    await appendLog({ op: 'delete', id: ev.id, before: ev, after: null, source: 'user' })
+  }
 }
