@@ -43,7 +43,7 @@ export default function TrendView({ events }) {
       {/* 7-day bars */}
       <section className="flex flex-col gap-5">
         <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Last 7 days</h2>
-        <FeedMilkBarRow title="Feeds / day (by milk type)" series={series} />
+        <FeedMilkBarRow title="Feed volume / day (by milk type)" series={series} />
         <GroupedBarRow
           title="Pumping / day"
           series={series}
@@ -299,7 +299,7 @@ function StackedBarRow({ title, series }) {
 // and other (milk type not recorded). Tooltip also surfaces volume where known.
 function FeedMilkBarRow({ title, series }) {
   const [tooltip, setTooltip] = useState(null)
-  const max = Math.max(...series.map(d => d.feedsBreast + d.feedsFormula + d.feedsOther), 1)
+  const max = Math.max(...series.map(d => d.feedsBreastMl + d.feedsFormulaMl + d.feedsOtherMl), 1)
 
   return (
     <div>
@@ -312,10 +312,10 @@ function FeedMilkBarRow({ title, series }) {
         </span>
       </div>
       <div className="flex items-start gap-1">
-        <YAxis max={max} />
+        <YAxis max={max} unit="ml" />
         <div className="flex-1 flex items-start gap-2">
           {series.map((d, i) => {
-            const total = d.feedsBreast + d.feedsFormula + d.feedsOther
+            const totalMl = d.feedsBreastMl + d.feedsFormulaMl + d.feedsOtherMl
             const seg = v => (v > 0 ? Math.max((v / max) * TRACK_PX, 4) : 0)
             // Anchor edge-day tooltips inward so they don't spill off-screen.
             const isFirst = i === 0
@@ -329,16 +329,18 @@ function FeedMilkBarRow({ title, series }) {
                   onClick={() => setTooltip(tooltip === d.key ? null : d.key)}
                 >
                   <Gridlines />
-                  <div className="relative w-full rounded-t bg-gray-300 dark:bg-gray-600" style={{ height: seg(d.feedsOther) }} />
-                  <div className="relative w-full bg-orange-400" style={{ height: seg(d.feedsFormula) }} />
-                  <div className="relative w-full bg-blue-400" style={{ height: seg(d.feedsBreast) }} />
-                  {tooltip === d.key && total > 0 && (
-                    <div className={`absolute -top-6 ${tipPos} rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-2 py-0.5 whitespace-nowrap z-10 shadow`}>
-                      breast {d.feedsBreast}{d.feedsBreastMl ? ` (${d.feedsBreastMl}ml)` : ''} · formula {d.feedsFormula}{d.feedsFormulaMl ? ` (${d.feedsFormulaMl}ml)` : ''}{d.feedsOther ? ` · other ${d.feedsOther}` : ''}
+                  <div className="relative w-full rounded-t bg-gray-300 dark:bg-gray-600" style={{ height: seg(d.feedsOtherMl) }} />
+                  <div className="relative w-full bg-orange-400" style={{ height: seg(d.feedsFormulaMl) }} />
+                  <div className="relative w-full bg-blue-400" style={{ height: seg(d.feedsBreastMl) }} />
+                  {tooltip === d.key && totalMl > 0 && (
+                    <div className={`absolute -top-10 ${tipPos} rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-2 py-1 whitespace-nowrap z-10 shadow flex flex-col gap-0.5`}>
+                      <span>breast milk {d.feedsBreastMl}ml</span>
+                      <span>formula {d.feedsFormulaMl}ml</span>
+                      {d.feedsOtherMl > 0 && <span>other {d.feedsOtherMl}ml</span>}
                     </div>
                   )}
                 </div>
-                <div className="text-[10px] text-gray-500 dark:text-gray-400">{total}</div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400">{totalMl}ml</div>
                 <div className="text-[10px] text-gray-300 dark:text-gray-600">{d.label}</div>
               </div>
             )
