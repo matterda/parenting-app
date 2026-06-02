@@ -41,11 +41,22 @@ export function dailySeries(events, days = 7) {
     const isDiaper = e => e.type === 'diaper'
     const feedEvents = dayEvents.filter(e => e.type === 'feed')
     const pumpEvents = dayEvents.filter(e => e.type === 'pumping')
+    const breastFeeds  = feedEvents.filter(e => feedMilkCategory(e) === 'breast')
+    const formulaFeeds = feedEvents.filter(e => feedMilkCategory(e) === 'formula')
+    const otherFeeds   = feedEvents.filter(e => feedMilkCategory(e) === 'other')
+    const volSum = arr => arr.reduce((s, e) => s + (Number(e.data?.volume_ml) || 0), 0)
     series.push({
       key,
       label: day.toLocaleDateString([], { weekday: 'short' }),
       feeds: feedEvents.length,
       feedsVolumeMl: feedEvents.reduce((s, e) => s + (Number(e.data?.volume_ml) || 0), 0),
+      // Feeds split by milk type (counts + volume where known)
+      feedsBreast: breastFeeds.length,
+      feedsFormula: formulaFeeds.length,
+      feedsOther: otherFeeds.length,
+      feedsBreastMl: volSum(breastFeeds),
+      feedsFormulaMl: volSum(formulaFeeds),
+      feedsOtherMl: volSum(otherFeeds),
       pumpings: pumpEvents.length,
       pumpingsVolumeMl: pumpEvents.reduce((s, e) => s + (Number(e.data?.volume_ml) || 0), 0),
       // pee = wet-only + both; poo = dirty-only + both
@@ -55,6 +66,18 @@ export function dailySeries(events, days = 7) {
     })
   }
   return series
+}
+
+// Classify a feed event by milk type:
+//   'breast'  — fed directly at the breast, or a bottle of expressed breast milk
+//   'formula' — a bottle of formula
+//   'other'   — milk type not recorded (or 'mixed')
+export function feedMilkCategory(e) {
+  const d = e.data ?? {}
+  if (d.method === 'breast') return 'breast'
+  if (d.milk_type === 'breast_milk') return 'breast'
+  if (d.milk_type === 'formula') return 'formula'
+  return 'other'
 }
 
 // Sum of completed sleep durations (events with both start and end) for a day's events.

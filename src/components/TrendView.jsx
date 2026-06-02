@@ -43,13 +43,7 @@ export default function TrendView({ events }) {
       {/* 7-day bars */}
       <section className="flex flex-col gap-5">
         <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Last 7 days</h2>
-        <GroupedBarRow
-          title="Feeds / day"
-          series={series}
-          fieldA="feeds" labelA="count" colorA="bg-blue-400"
-          fieldB="feedsVolumeMl" labelB="ml" colorB="bg-blue-200 dark:bg-blue-800"
-          unitB="ml"
-        />
+        <FeedMilkBarRow title="Feeds / day (by milk type)" series={series} />
         <GroupedBarRow
           title="Pumping / day"
           series={series}
@@ -286,6 +280,57 @@ function StackedBarRow({ title, series }) {
                   {tooltip === d.key && total > 0 && (
                     <div className="absolute -top-6 left-1/2 -translate-x-1/2 rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-1.5 py-0.5 whitespace-nowrap z-10 shadow">
                       pee {d.diapersPee} · poo {d.diapersPoo}
+                    </div>
+                  )}
+                </div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400">{total}</div>
+                <div className="text-[10px] text-gray-300 dark:text-gray-600">{d.label}</div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── FeedMilkBarRow ───────────────────────────────────────────────────────────
+// Stacked bar of daily feed counts split by milk type: breast milk, formula,
+// and other (milk type not recorded). Tooltip also surfaces volume where known.
+function FeedMilkBarRow({ title, series }) {
+  const [tooltip, setTooltip] = useState(null)
+  const max = Math.max(...series.map(d => d.feedsBreast + d.feedsFormula + d.feedsOther), 1)
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-1.5">
+        <span className="text-xs text-gray-400 dark:text-gray-500">{title}</span>
+        <span className="flex items-center gap-2 text-[10px] text-gray-400 dark:text-gray-500">
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-blue-400" />breast</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-orange-400" />formula</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-gray-300 dark:bg-gray-600" />other</span>
+        </span>
+      </div>
+      <div className="flex items-start gap-1">
+        <YAxis max={max} />
+        <div className="flex-1 flex items-start gap-2">
+          {series.map(d => {
+            const total = d.feedsBreast + d.feedsFormula + d.feedsOther
+            const seg = v => (v > 0 ? Math.max((v / max) * TRACK_PX, 4) : 0)
+            return (
+              <div key={d.key} className="flex-1 flex flex-col items-center gap-1">
+                <div
+                  className="relative w-full flex flex-col justify-end cursor-pointer hover:opacity-75 transition-opacity"
+                  style={{ height: TRACK_PX }}
+                  onClick={() => setTooltip(tooltip === d.key ? null : d.key)}
+                >
+                  <Gridlines />
+                  <div className="relative w-full rounded-t bg-gray-300 dark:bg-gray-600" style={{ height: seg(d.feedsOther) }} />
+                  <div className="relative w-full bg-orange-400" style={{ height: seg(d.feedsFormula) }} />
+                  <div className="relative w-full bg-blue-400" style={{ height: seg(d.feedsBreast) }} />
+                  {tooltip === d.key && total > 0 && (
+                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-2 py-0.5 whitespace-nowrap z-10 shadow">
+                      breast {d.feedsBreast}{d.feedsBreastMl ? ` (${d.feedsBreastMl}ml)` : ''} · formula {d.feedsFormula}{d.feedsFormulaMl ? ` (${d.feedsFormulaMl}ml)` : ''}{d.feedsOther ? ` · other ${d.feedsOther}` : ''}
                     </div>
                   )}
                 </div>
