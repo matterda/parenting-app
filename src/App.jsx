@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { addRawEvent, replaceWithExtracted, getAllEvents, deleteEvent, updateEvent, upsertEvent } from './db'
+import { addRawEvent, replaceWithExtracted, getAllEvents, deleteEvent, updateEvent, upsertEvent, addImportedEvents } from './db'
 import { extractEvents } from './api'
+import { toLocalISO } from './utils/time'
 import { scheduleCheck } from './notifications'
 import { syncPull, syncPush, syncDelete, syncServerTime } from './sync'
 import { saveSnapshot } from './utils/snapshots'
@@ -161,6 +162,21 @@ export default function App() {
     await refreshEvents()
   }
 
+  async function handleStartSleep() {
+    if (activeSleep) return
+    await addImportedEvents([{
+      type: 'sleep',
+      timestamp_start: toLocalISO(new Date()),
+      timestamp_end: null,
+      data: {},
+      context_note: null,
+      raw_text: null,
+      confidence: 'high',
+      needs_confirmation: [],
+    }])
+    await refreshEvents()
+  }
+
   function reset() {
     setPhase('idle')
     setExtracted(null)
@@ -268,9 +284,12 @@ export default function App() {
             )}
             {!activeSleep && (() => {
               const lastSleep = lastOfType(events, 'sleep')
-              return lastSleep?.timestamp_end
-                ? <LastSleepBanner lastSleep={lastSleep} />
-                : null
+              return (
+                <LastSleepBanner
+                  lastSleep={lastSleep?.timestamp_end ? lastSleep : null}
+                  onStartSleep={handleStartSleep}
+                />
+              )
             })()}
             <FeedOverdueBanner events={events} />
             <p className="text-sm text-gray-500 dark:text-gray-400">

@@ -32,26 +32,40 @@ export default function ActiveSleepBanner({ since, onMarkAwake }) {
   )
 }
 
-// Shown in Log tab when baby is awake — time since last sleep ended
-export function LastSleepBanner({ lastSleep }) {
-  const [since, setSince] = useState(getElapsed(lastSleep.timestamp_end))
+// Shown in Log tab when baby is awake — time since last sleep ended, plus a
+// button to start a new sleep (mirrors the "Awake" button while sleeping).
+export function LastSleepBanner({ lastSleep, onStartSleep }) {
+  const end = lastSleep?.timestamp_end ?? null
+  const [since, setSince] = useState(() => (end ? getElapsed(end) : null))
 
   useEffect(() => {
-    const id = setInterval(() => setSince(getElapsed(lastSleep.timestamp_end)), 60000)
+    if (!end) return
+    setSince(getElapsed(end))
+    const id = setInterval(() => setSince(getElapsed(end)), 60000)
     return () => clearInterval(id)
-  }, [lastSleep.timestamp_end])
+  }, [end])
 
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 flex items-center gap-3 shadow-sm">
-      <span className="text-lg">😴</span>
-      <div>
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
-          Awake for {since}
-        </p>
-        <p className="text-xs text-gray-400 dark:text-gray-500">
-          Last sleep ended at {formatTime(lastSleep.timestamp_end)}
-        </p>
+    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 flex items-center justify-between gap-3 shadow-sm">
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="text-lg">😴</span>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+            {end ? `Awake for ${since}` : 'Baby awake'}
+          </p>
+          {end && (
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              Last sleep ended at {formatTime(end)}
+            </p>
+          )}
+        </div>
       </div>
+      <button
+        onClick={onStartSleep}
+        className="shrink-0 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition"
+      >
+        Sleep 🌙
+      </button>
     </div>
   )
 }
