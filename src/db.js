@@ -17,6 +17,7 @@ function getDB() {
 export async function addRawEvent(rawText) {
   const db = await getDB()
   const record = {
+    id: newId(),
     raw_text: rawText,
     timestamp_start: new Date().toISOString(),
     timestamp_end: null,
@@ -25,10 +26,20 @@ export async function addRawEvent(rawText) {
     context_note: null,
     confidence: null,
     needs_confirmation: [],
-    extracted: false
+    extracted: false,
+    updated_at: new Date().toISOString(),
   }
-  const id = await db.add(STORE, record)
-  return { ...record, id }
+  await db.put(STORE, record)
+  return record
+}
+
+// Globally-unique ID. Auto-increment integers collide across devices (both
+// phones independently mint id 1, 2, 3…), which corrupts Firebase sync, so
+// every new record gets a UUID instead.
+function newId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  // Fallback for very old browsers
+  return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10)
 }
 
 // Replace the raw placeholder with the confirmed extracted events.
@@ -39,10 +50,9 @@ export async function replaceWithExtracted(placeholderId, confirmedEvents) {
   await tx.store.delete(placeholderId)
   const saved = []
   for (const ev of confirmedEvents) {
-    const record = { ...ev, extracted: true, updated_at: new Date().toISOString() }
-    delete record.id // let IDB assign a new auto-increment id
-    const id = await tx.store.add(record)
-    saved.push({ ...record, id })
+    const record = { ...ev, id: newId(), extracted: true, updated_at: new Date().toISOString() }
+    await tx.store.put(record)
+    saved.push(record)
   }
   await tx.done
   return saved
@@ -59,8 +69,9 @@ export async function updateEvent(id, patch) {
 // Falls back to keeping existing when neither has updated_at (legacy records).
 export async function upsertEvent(ev) {
   const db = await getDB()
-  // Normalise ID: Firebase JSON keys round-trip as numbers, but be safe.
-  const normId = typeof ev.id === 'string' ? Number(ev.id) : ev.id
+  // Legacy events have numeric IDs; new ones are UUID strings. Only coerce
+  // purely-numeric strings back to numbers — never mangle a UUID into NaN.
+  const normId = typeof ev.id === 'string' && /^\d+$/.test(ev.id) ? Number(ev.id) : ev.id
   const normEv = normId !== ev.id ? { ...ev, id: normId } : ev
   const existing = await db.get(STORE, normId)
   if (!existing) {

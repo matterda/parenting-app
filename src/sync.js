@@ -7,16 +7,36 @@ export function getSyncUrl() {
   return (localStorage.getItem('firebase_sync_url') ?? '').replace(/\/$/, '')
 }
 
-// Push all local events to Firebase (full overwrite of /events)
+// Push local events to Firebase by MERGING (PATCH), not overwriting.
+// A full PUT of /events is last-writer-wins over the entire collection: a
+// device that pushes a moment after another erases events it never saw. PATCH
+// only writes the keys we send, leaving the other device's events intact.
+// We also fetch tombstones first and skip any deleted event, so a stale local
+// copy can't resurrect something another device already deleted.
 export async function syncPush(events) {
   const base = getSyncUrl()
   if (!base) return
-  const obj = {}
-  for (const ev of events) obj[ev.id] = ev
+
+  let tombstoned = new Set()
+  try {
+    const res = await fetch(`${base}/tombstones.json`)
+    if (res.ok) {
+      const data = await res.json()
+      if (data) tombstoned = new Set(Object.keys(data))
+    }
+  } catch { /* offline — proceed best-effort without tombstone filtering */ }
+
+  const updates = {}
+  for (const ev of events) {
+    if (tombstoned.has(String(ev.id))) continue
+    updates[ev.id] = ev
+  }
+  if (Object.keys(updates).length === 0) return
+
   await fetch(`${base}/events.json`, {
-    method: 'PUT',
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(obj),
+    body: JSON.stringify(updates),
   })
 }
 
