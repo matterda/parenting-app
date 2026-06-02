@@ -21,6 +21,7 @@ const THEMES = ['system', 'light', 'dark']
 const DELAY_OPTIONS = [1, 2, 3, 4]
 const FILTER_OPTIONS = [
   { value: 'any', label: 'Any feed' },
+  { value: 'bottle', label: 'Bottle only' },
   { value: 'breast', label: 'Breast only' },
   { value: 'formula', label: 'Formula only' },
 ]

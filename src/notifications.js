@@ -27,6 +27,7 @@ function feedMatchesFilter(ev, filter) {
   if (filter === 'any') return true
   if (filter === 'formula') return ev.data?.milk_type === 'formula'
   if (filter === 'breast') return ev.data?.method === 'breast' || ev.data?.milk_type === 'breast_milk'
+  if (filter === 'bottle') return ev.data?.method === 'bottle' // any bottle, regardless of milk type
   return true
 }
 
