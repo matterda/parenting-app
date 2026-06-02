@@ -46,9 +46,11 @@ export async function syncPull() {
     ])
     const evData = evRes.ok ? await evRes.json() : null
     const tbData = tbRes.ok ? await tbRes.json() : null
+    // IDB auto-increment keys are numbers; Firebase JSON keys are strings — coerce back.
+    const coerceId = id => (isNaN(Number(id)) ? id : Number(id))
     return {
       events: evData ? Object.values(evData) : [],
-      tombstoneIds: tbData ? Object.keys(tbData) : [],
+      tombstoneIds: tbData ? Object.keys(tbData).map(coerceId) : [],
     }
   } catch {
     return { events: [], tombstoneIds: [] }

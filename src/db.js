@@ -39,7 +39,7 @@ export async function replaceWithExtracted(placeholderId, confirmedEvents) {
   await tx.store.delete(placeholderId)
   const saved = []
   for (const ev of confirmedEvents) {
-    const record = { ...ev, extracted: true }
+    const record = { ...ev, extracted: true, updated_at: new Date().toISOString() }
     delete record.id // let IDB assign a new auto-increment id
     const id = await tx.store.add(record)
     saved.push({ ...record, id })
@@ -52,15 +52,24 @@ export async function updateEvent(id, patch) {
   const db = await getDB()
   const existing = await db.get(STORE, id)
   if (!existing) throw new Error(`Event ${id} not found`)
-  return db.put(STORE, { ...existing, ...patch })
+  return db.put(STORE, { ...existing, ...patch, updated_at: new Date().toISOString() })
 }
 
-// Upsert: create if not present, merge if present (used for sync pull).
-// Local copy wins on conflict so edits made offline aren't overwritten.
+// Upsert: create if not present, keep the more-recently-updated copy on conflict.
+// Falls back to keeping existing when neither has updated_at (legacy records).
 export async function upsertEvent(ev) {
   const db = await getDB()
-  const existing = await db.get(STORE, ev.id)
-  return db.put(STORE, existing ? { ...ev, ...existing } : ev)
+  // Normalise ID: Firebase JSON keys round-trip as numbers, but be safe.
+  const normId = typeof ev.id === 'string' ? Number(ev.id) : ev.id
+  const normEv = normId !== ev.id ? { ...ev, id: normId } : ev
+  const existing = await db.get(STORE, normId)
+  if (!existing) {
+    return db.put(STORE, normEv)
+  }
+  // Prefer whichever copy was updated more recently
+  const remoteTs = normEv.updated_at ?? ''
+  const localTs  = existing.updated_at ?? ''
+  return db.put(STORE, remoteTs > localTs ? normEv : existing)
 }
 
 export async function deleteEvent(id) {
