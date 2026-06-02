@@ -134,13 +134,38 @@ function EventCard({ event, onFieldChange }) {
   )
 }
 
+// Categorical fields get a dropdown instead of a free-text input, so the user
+// can't mistype the exact token (e.g. "left" instead of "L").
+const FIELD_OPTIONS = {
+  side: ['L', 'R', 'both'],
+  milk_type: ['breast_milk', 'formula', 'mixed'],
+  kind: ['wet', 'dirty', 'both'],
+  method: ['breast', 'bottle'],
+}
+
 function FieldChip({ field, label, value, needsConfirm, onChange }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(displayValue(field, value))
+  const options = FIELD_OPTIONS[field]
 
   function commit() {
     onChange(draft)
     setEditing(false)
+  }
+
+  if (editing && options) {
+    return (
+      <select
+        autoFocus
+        className="rounded-lg border border-violet-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-violet-400"
+        value={value ?? ''}
+        onChange={e => { onChange(e.target.value || null); setEditing(false) }}
+        onBlur={() => setEditing(false)}
+      >
+        <option value="">?</option>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    )
   }
 
   if (editing) {
@@ -184,17 +209,22 @@ function getConfirmableFields(event) {
       candidates.push({ field, label, currentValue: value })
     }
   }
+  // Force-show a field even when null, so categorical chips (side, milk type…)
+  // are always available to set — the LLM frequently omits them.
+  const always = (field, label, value) => {
+    candidates.push({ field, label, currentValue: value })
+  }
 
   if (event.type === 'feed') {
-    add('milk_type', 'milk type', d.milk_type)
+    always('milk_type', 'milk type', d.milk_type)
     add('volume_ml', 'ml', d.volume_ml)
     add('duration_min', 'min', d.duration_min)
-    add('side', 'side', d.side)
+    always('side', 'side', d.side)
   }
   if (event.type === 'pumping') {
     add('volume_ml', 'ml', d.volume_ml)
     add('duration_min', 'min', d.duration_min)
-    add('side', 'side', d.side)
+    always('side', 'side', d.side)
   }
   if (event.type === 'sleep') {
     add('timestamp_end', 'end time', event.timestamp_end)
