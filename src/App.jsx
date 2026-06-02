@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { addRawEvent, replaceWithExtracted, getAllEvents, deleteEvent, updateEvent, upsertEvent } from './db'
 import { extractEvents } from './api'
 import { scheduleCheck } from './notifications'
@@ -64,6 +64,30 @@ export default function App() {
   }, [events])
 
   const activeSleep = getActiveSleep(events)
+
+  // ── swipe to change tab ──────────────────────────────────────────────────
+  const touchStartX = useRef(null)
+  const touchStartY = useRef(null)
+
+  const handleTouchStart = useCallback(e => {
+    touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
+  }, [])
+
+  const handleTouchEnd = useCallback(e => {
+    if (touchStartX.current === null || phase !== 'idle') return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    const dy = e.changedTouches[0].clientY - touchStartY.current
+    touchStartX.current = null
+    touchStartY.current = null
+    // Ignore if mostly vertical (scrolling)
+    if (Math.abs(dy) > Math.abs(dx)) return
+    // Require at least 60px horizontal swipe
+    if (Math.abs(dx) < 60) return
+    const idx = TABS.indexOf(tab)
+    if (dx < 0 && idx < TABS.length - 1) setTab(TABS[idx + 1])
+    if (dx > 0 && idx > 0)               setTab(TABS[idx - 1])
+  }, [phase, tab])
 
   async function handleAdd(rawText) {
     setPendingText(rawText)
@@ -193,7 +217,11 @@ export default function App() {
         ))}
       </nav>
 
-      <main className="flex-1 overflow-y-auto p-4 max-w-xl mx-auto w-full">
+      <main
+        className="flex-1 overflow-y-auto p-4 max-w-xl mx-auto w-full"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
 
         {phase === 'extracting' && (
           <div className="flex flex-col items-center justify-center gap-4 py-16">
