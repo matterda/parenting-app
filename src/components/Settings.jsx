@@ -351,6 +351,33 @@ export default function Settings({ onNotifSettingsChanged, onRestore }) {
         )}
       </div>
 
+      <hr className="border-gray-100 dark:border-gray-800" />
+
+      {/* Version */}
+      <div className="flex flex-col gap-1">
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Version</p>
+        <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
+          <span>App version</span>
+          <span className="font-mono text-gray-600 dark:text-gray-300">
+            {APP_VERSION} · {GIT_COMMIT}
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
+          <span>Last updated</span>
+          <span className="text-gray-600 dark:text-gray-300">{BUILD_DATE}</span>
+        </div>
+      </div>
+
     </div>
   )
 }
+
+// Build-time constants injected by Vite (see vite.config.js `define`).
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
+const GIT_COMMIT  = typeof __GIT_COMMIT__  !== 'undefined' ? __GIT_COMMIT__  : 'local'
+const BUILD_DATE  = (() => {
+  try {
+    const iso = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : null
+    return iso ? new Date(iso).toLocaleString() : '—'
+  } catch { return '—' }
+})()
