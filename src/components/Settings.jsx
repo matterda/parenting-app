@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { getAllEvents, clearAllEvents, upsertEvent } from '../db'
+import { getAllEvents, clearAllEvents, upsertEvent, addImportedEvents } from '../db'
+import { parseEventsCsv, CSV_TEMPLATE } from '../utils/importCsv'
 import { getTheme, applyTheme } from '../theme'
 import { getNotifSettings, saveNotifSettings, requestPermission } from '../notifications'
 import { listSnapshots, getSnapshotData } from '../utils/snapshots'
@@ -49,6 +50,12 @@ export default function Settings({ onNotifSettingsChanged, onRestore }) {
   const [logCount, setLogCount] = useState(null)
   const [logBusy, setLogBusy] = useState(false)
   const [undoN, setUndoN] = useState(1)
+
+  // CSV import
+  const [csvText, setCsvText] = useState('')
+  const [csvPreview, setCsvPreview] = useState(null) // { events, errors }
+  const [csvImporting, setCsvImporting] = useState(false)
+  const [csvDone, setCsvDone] = useState(null)
 
   function saveBaby() {
     localStorage.setItem(BABY_NAME_KEY, babyName.trim())
@@ -164,6 +171,47 @@ export default function Settings({ onNotifSettingsChanged, onRestore }) {
       await applyState(events)
     } finally {
       setLogBusy(false)
+    }
+  }
+
+  // ── CSV import ──────────────────────────────────────────────────────────
+  function previewCsv(text) {
+    setCsvText(text)
+    setCsvDone(null)
+    setCsvPreview(text.trim() ? parseEventsCsv(text) : null)
+  }
+
+  async function handleCsvFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const text = await file.text()
+    previewCsv(text)
+    e.target.value = '' // allow re-picking the same file
+  }
+
+  function downloadTemplate() {
+    const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'baby-log-import-template.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function doCsvImport() {
+    if (!csvPreview || csvPreview.events.length === 0 || csvImporting) return
+    if (!window.confirm(`Import ${csvPreview.events.length} event${csvPreview.events.length > 1 ? 's' : ''}? They'll be added to your existing log.`)) return
+    setCsvImporting(true)
+    try {
+      await addImportedEvents(csvPreview.events)
+      setCsvDone(csvPreview.events.length)
+      setCsvText('')
+      setCsvPreview(null)
+      onRestore?.()
+      setSnapshots(listSnapshots())
+    } finally {
+      setCsvImporting(false)
     }
   }
 
@@ -387,6 +435,66 @@ export default function Settings({ onNotifSettingsChanged, onRestore }) {
         <p className="text-xs text-gray-400 dark:text-gray-500">
           All data lives in this browser only. Export regularly as your backup.
         </p>
+      </div>
+
+      <hr className="border-gray-100 dark:border-gray-800" />
+
+      {/* CSV import */}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Import from CSV</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          For bulk-adding historical records. One row per event. Columns:
+          {' '}<code className="text-[11px]">type, start, end, method, milk_type, side, volume_ml, duration_min, kind, value, unit, name, dose, label, note</code>.
+          Times are local, e.g. <code className="text-[11px]">2026-05-01 14:30</code>. Leave unused columns blank.
+        </p>
+
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={downloadTemplate}
+            className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+          >
+            Download template
+          </button>
+          <label className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition cursor-pointer">
+            Choose CSV file
+            <input type="file" accept=".csv,text/csv" className="hidden" onChange={handleCsvFile} />
+          </label>
+        </div>
+
+        <textarea
+          className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-xs font-mono shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400 resize-y"
+          rows={4}
+          placeholder="…or paste CSV here"
+          value={csvText}
+          onChange={e => previewCsv(e.target.value)}
+        />
+
+        {csvPreview && (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {csvPreview.events.length} valid event{csvPreview.events.length === 1 ? '' : 's'} ready to import
+              {csvPreview.errors.length > 0 && `, ${csvPreview.errors.length} row${csvPreview.errors.length === 1 ? '' : 's'} skipped`}.
+            </p>
+            {csvPreview.errors.length > 0 && (
+              <ul className="flex flex-col gap-0.5 rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950 p-2 max-h-40 overflow-y-auto">
+                {csvPreview.errors.map((err, i) => (
+                  <li key={i} className="text-[11px] text-red-600 dark:text-red-400">{err}</li>
+                ))}
+              </ul>
+            )}
+            <button
+              onClick={doCsvImport}
+              disabled={csvPreview.events.length === 0 || csvImporting}
+              className="self-start rounded-xl bg-violet-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:opacity-40 transition"
+            >
+              {csvImporting ? 'Importing…' : `Import ${csvPreview.events.length} event${csvPreview.events.length === 1 ? '' : 's'}`}
+            </button>
+          </div>
+        )}
+
+        {csvDone != null && (
+          <p className="text-xs text-green-600 dark:text-green-400">Imported {csvDone} event{csvDone === 1 ? '' : 's'} ✓</p>
+        )}
       </div>
 
       <hr className="border-gray-100 dark:border-gray-800" />

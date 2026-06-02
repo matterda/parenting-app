@@ -113,6 +113,21 @@ export async function upsertEvent(ev) {
   return merged
 }
 
+// Bulk-insert already-structured events (e.g. a one-time CSV import of
+// historical records). Each gets a fresh id + updated_at and is logged as a
+// user create so it syncs and is recoverable like any other event.
+export async function addImportedEvents(events) {
+  const db = await getDB()
+  const saved = []
+  for (const ev of events) {
+    const record = { ...ev, id: newId(), extracted: true, updated_at: serverNow() }
+    await db.put(STORE, record)
+    await appendLog({ op: 'create', id: record.id, before: null, after: record, source: 'user' })
+    saved.push(record)
+  }
+  return saved
+}
+
 export async function deleteEvent(id) {
   const db = await getDB()
   const before = await db.get(STORE, id)
