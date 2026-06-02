@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { addRawEvent, replaceWithExtracted, getAllEvents, deleteEvent, updateEvent, upsertEvent } from './db'
 import { extractEvents } from './api'
 import { scheduleCheck } from './notifications'
-import { syncPull, syncPush, syncDelete } from './sync'
+import { syncPull, syncPush, syncDelete, syncServerTime } from './sync'
 import { saveSnapshot } from './utils/snapshots'
 import { lastOfType } from './utils/aggregate'
 import LogInput from './components/LogInput'
@@ -34,6 +34,7 @@ export default function App() {
 
   useEffect(() => {
     async function init() {
+      await syncServerTime()
       const { events: remoteEvs, tombstoneIds } = await syncPull()
       for (const ev of remoteEvs) await upsertEvent(ev)
       for (const id of tombstoneIds) await deleteEvent(id).catch(() => {})
@@ -49,6 +50,7 @@ export default function App() {
   useEffect(() => {
     async function onVisible() {
       if (document.visibilityState !== 'visible') return
+      await syncServerTime()
       const { events: remoteEvs, tombstoneIds } = await syncPull()
       let changed = tombstoneIds.length > 0 || remoteEvs.length > 0
       for (const ev of remoteEvs) await upsertEvent(ev)

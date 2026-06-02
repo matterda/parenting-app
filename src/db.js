@@ -1,4 +1,6 @@
 import { openDB } from 'idb'
+import { mergeEvent } from './utils/mergeEvent'
+import { serverNow } from './utils/serverTime'
 
 const DB_NAME = 'baby-log'
 const DB_VERSION = 1
@@ -27,7 +29,7 @@ export async function addRawEvent(rawText) {
     confidence: null,
     needs_confirmation: [],
     extracted: false,
-    updated_at: new Date().toISOString(),
+    updated_at: serverNow(),
   }
   await db.put(STORE, record)
   return record
@@ -50,7 +52,7 @@ export async function replaceWithExtracted(placeholderId, confirmedEvents) {
   await tx.store.delete(placeholderId)
   const saved = []
   for (const ev of confirmedEvents) {
-    const record = { ...ev, id: newId(), extracted: true, updated_at: new Date().toISOString() }
+    const record = { ...ev, id: newId(), extracted: true, updated_at: serverNow() }
     await tx.store.put(record)
     saved.push(record)
   }
@@ -62,11 +64,12 @@ export async function updateEvent(id, patch) {
   const db = await getDB()
   const existing = await db.get(STORE, id)
   if (!existing) throw new Error(`Event ${id} not found`)
-  return db.put(STORE, { ...existing, ...patch, updated_at: new Date().toISOString() })
+  return db.put(STORE, { ...existing, ...patch, updated_at: serverNow() })
 }
 
-// Upsert: create if not present, keep the more-recently-updated copy on conflict.
-// Falls back to keeping existing when neither has updated_at (legacy records).
+// Upsert: create if not present, otherwise field-level merge with the existing
+// copy (see mergeEvent) so concurrent edits from different devices combine
+// instead of clobbering each other.
 export async function upsertEvent(ev) {
   const db = await getDB()
   // Legacy events have numeric IDs; new ones are UUID strings. Only coerce
@@ -77,10 +80,9 @@ export async function upsertEvent(ev) {
   if (!existing) {
     return db.put(STORE, normEv)
   }
-  // Prefer whichever copy was updated more recently
-  const remoteTs = normEv.updated_at ?? ''
-  const localTs  = existing.updated_at ?? ''
-  return db.put(STORE, remoteTs > localTs ? normEv : existing)
+  const merged = mergeEvent(existing, normEv)
+  merged.id = normId
+  return db.put(STORE, merged)
 }
 
 export async function deleteEvent(id) {

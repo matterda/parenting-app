@@ -3,8 +3,32 @@
 // Tombstones stored at /tombstones/{id} = deletedAt ISO string
 // Both devices push on every write and pull on open / visibilitychange.
 
+import { mergeEvent } from './utils/mergeEvent'
+import { setServerOffset } from './utils/serverTime'
+
 export function getSyncUrl() {
   return (localStorage.getItem('firebase_sync_url') ?? '').replace(/\/$/, '')
+}
+
+// Learn the offset between this device's clock and the Firebase server, so
+// updated_at ordering is reliable even if a phone's clock is off. We write the
+// server-timestamp sentinel to a scratch path; RTDB resolves it and returns the
+// server epoch ms in the response body. Roundtrip is corrected with rtt/2.
+export async function syncServerTime() {
+  const base = getSyncUrl()
+  if (!base) return
+  try {
+    const t0 = Date.now()
+    const res = await fetch(`${base}/_serverTime.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ '.sv': 'timestamp' }),
+    })
+    if (!res.ok) return
+    const serverMs = await res.json()
+    const localMid = t0 + (Date.now() - t0) / 2
+    if (typeof serverMs === 'number') setServerOffset(Math.round(serverMs - localMid))
+  } catch { /* offline — keep last known offset */ }
 }
 
 // Push local events to Firebase by MERGING (PATCH), not overwriting.
@@ -13,10 +37,10 @@ export function getSyncUrl() {
 // only writes the keys we send, leaving the other device's events intact.
 //
 // Crucially, PATCH itself is still last-writer-wins *per key* with no timestamp
-// check — so before pushing we fetch the current remote state and:
+// check — so before pushing we fetch the current remote state and, per event:
 //   - skip any event that's been tombstoned (don't resurrect a delete), and
-//   - skip any event whose remote copy has a NEWER updated_at than ours, so a
-//     stale local copy can't clobber an edit another device just made.
+//   - field-level merge with the remote copy (see mergeEvent), so we neither
+//     clobber a newer remote edit nor drop fields the remote hasn't seen yet.
 export async function syncPush(events) {
   const base = getSyncUrl()
   if (!base) return
@@ -38,11 +62,18 @@ export async function syncPush(events) {
   const updates = {}
   for (const ev of events) {
     const key = String(ev.id)
-    if (tombstoned.has(key)) continue
+    if (tombstoned.has(key)) continue          // delete wins — never resurrect
     const remoteEv = remote[key]
-    // Don't overwrite a newer remote edit with our stale copy.
-    if (remoteEv && (remoteEv.updated_at ?? '') > (ev.updated_at ?? '')) continue
-    updates[key] = ev
+    if (!remoteEv) {
+      updates[key] = ev
+      continue
+    }
+    // Field-level merge with the remote copy so we neither clobber a newer
+    // remote edit nor drop fields the remote doesn't have yet. Only write if
+    // the merge actually changes the remote value.
+    const merged = mergeEvent(ev, remoteEv)
+    merged.id = ev.id
+    if (JSON.stringify(merged) !== JSON.stringify(remoteEv)) updates[key] = merged
   }
   if (Object.keys(updates).length === 0) return
 
