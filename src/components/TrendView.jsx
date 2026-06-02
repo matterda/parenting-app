@@ -314,9 +314,13 @@ function FeedMilkBarRow({ title, series }) {
       <div className="flex items-start gap-1">
         <YAxis max={max} />
         <div className="flex-1 flex items-start gap-2">
-          {series.map(d => {
+          {series.map((d, i) => {
             const total = d.feedsBreast + d.feedsFormula + d.feedsOther
             const seg = v => (v > 0 ? Math.max((v / max) * TRACK_PX, 4) : 0)
+            // Anchor edge-day tooltips inward so they don't spill off-screen.
+            const isFirst = i === 0
+            const isLast = i === series.length - 1
+            const tipPos = isFirst ? 'left-0' : isLast ? 'right-0' : 'left-1/2 -translate-x-1/2'
             return (
               <div key={d.key} className="flex-1 flex flex-col items-center gap-1">
                 <div
@@ -329,7 +333,7 @@ function FeedMilkBarRow({ title, series }) {
                   <div className="relative w-full bg-orange-400" style={{ height: seg(d.feedsFormula) }} />
                   <div className="relative w-full bg-blue-400" style={{ height: seg(d.feedsBreast) }} />
                   {tooltip === d.key && total > 0 && (
-                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-2 py-0.5 whitespace-nowrap z-10 shadow">
+                    <div className={`absolute -top-6 ${tipPos} rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-2 py-0.5 whitespace-nowrap z-10 shadow`}>
                       breast {d.feedsBreast}{d.feedsBreastMl ? ` (${d.feedsBreastMl}ml)` : ''} · formula {d.feedsFormula}{d.feedsFormulaMl ? ` (${d.feedsFormulaMl}ml)` : ''}{d.feedsOther ? ` · other ${d.feedsOther}` : ''}
                     </div>
                   )}
