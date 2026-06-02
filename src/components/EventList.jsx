@@ -54,9 +54,6 @@ export default function EventList({ events, onDelete, onEdit }) {
             onClick={() => setFilter(t)}
           />
         ))}
-        {events.some(e => !e.extracted) && (
-          <FilterChip label="raw" active={filter === 'raw'} onClick={() => setFilter('raw')} />
-        )}
       </div>
 
       {visible.length === 0 ? (
