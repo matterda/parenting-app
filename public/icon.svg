@@ -1,4 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <clipPath id="bottle">
+      <rect x="184" y="184" width="144" height="250" rx="30"/>
+    </clipPath>
+  </defs>
   <rect width="512" height="512" rx="96" fill="#7c3aed"/>
-  <text x="256" y="340" font-size="280" text-anchor="middle" font-family="sans-serif">🍼</text>
+
+  <!-- teat -->
+  <path d="M244 60 Q256 48 268 60 L268 92 L244 92 Z" fill="#fbbf24"/>
+  <path d="M226 92 Q210 140 236 152 L276 152 Q302 140 286 92 Z" fill="#fbbf24"/>
+
+  <!-- collar ring -->
+  <rect x="196" y="148" width="120" height="30" rx="10" fill="#ede9fe"/>
+
+  <!-- bottle body -->
+  <rect x="184" y="184" width="144" height="250" rx="30" fill="#ffffff"/>
+
+  <!-- milk fill -->
+  <g clip-path="url(#bottle)">
+    <rect x="184" y="296" width="144" height="138" fill="#c4b5fd"/>
+    <path d="M184 296 q36 -22 72 0 t72 0 l0 20 l-144 0 Z" fill="#c4b5fd"/>
+  </g>
+
+  <!-- measurement ticks -->
+  <g stroke="#a78bfa" stroke-width="9" stroke-linecap="round">
+    <line x1="298" y1="222" x2="316" y2="222"/>
+    <line x1="298" y1="252" x2="316" y2="252"/>
+    <line x1="298" y1="282" x2="316" y2="282"/>
+  </g>
 </svg>
