@@ -22,7 +22,9 @@ const TYPE_LABELS = {
 }
 
 export default function EventList({ events, onDelete, onEdit }) {
-  const [filter, setFilter] = useState('all')
+  // Set of selected type filters; empty = show all. A non-extracted event
+  // matches the 'raw' filter.
+  const [selected, setSelected] = useState(() => new Set())
 
   if (events.length === 0) {
     return (
@@ -35,23 +37,28 @@ export default function EventList({ events, onDelete, onEdit }) {
   // Derive the set of types that actually appear in the list
   const presentTypes = [...new Set(events.map(e => e.type ?? 'raw').filter(Boolean))]
 
-  const visible = filter === 'all'
-    ? events
-    : filter === 'raw'
-      ? events.filter(e => !e.extracted)
-      : events.filter(e => e.type === filter)
+  const matches = e => selected.has(e.extracted ? e.type : 'raw')
+  const visible = selected.size === 0 ? events : events.filter(matches)
+
+  function toggle(t) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(t) ? next.delete(t) : next.add(t)
+      return next
+    })
+  }
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Filter chips */}
+      {/* Filter chips — multi-select; "All" clears the selection */}
       <div className="flex flex-wrap gap-1.5">
-        <FilterChip label="All" active={filter === 'all'} onClick={() => setFilter('all')} />
+        <FilterChip label="All" active={selected.size === 0} onClick={() => setSelected(new Set())} />
         {presentTypes.map(t => (
           <FilterChip
             key={t}
             label={TYPE_LABELS[t] ?? t}
-            active={filter === t}
-            onClick={() => setFilter(t)}
+            active={selected.has(t)}
+            onClick={() => toggle(t)}
           />
         ))}
       </div>
