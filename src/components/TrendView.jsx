@@ -320,6 +320,9 @@ function FeedMilkBarRow({ title, series }) {
             // Strictly proportional — no per-segment min height, so the stacked
             // total matches the y-axis scale exactly.
             const seg = v => (v / max) * TRACK_PX
+            // Round only the topmost non-zero segment (DOM order top→bottom is
+            // other, formula, breast) so inner segment joins stay square.
+            const topSeg = d.feedsOtherMl > 0 ? 'other' : d.feedsFormulaMl > 0 ? 'formula' : 'breast'
             // Anchor edge-day tooltips inward so they don't spill off-screen.
             const isFirst = i === 0
             const isLast = i === series.length - 1
@@ -332,9 +335,9 @@ function FeedMilkBarRow({ title, series }) {
                   onClick={() => setTooltip(tooltip === d.key ? null : d.key)}
                 >
                   <Gridlines />
-                  <div className="relative w-full rounded-t bg-gray-300 dark:bg-gray-600" style={{ height: seg(d.feedsOtherMl) }} />
-                  <div className="relative w-full rounded-t bg-orange-400" style={{ height: seg(d.feedsFormulaMl) }} />
-                  <div className="relative w-full rounded-t bg-blue-400" style={{ height: seg(d.feedsBreastMl) }} />
+                  <div className={`relative w-full bg-gray-300 dark:bg-gray-600 ${topSeg === 'other' ? 'rounded-t' : ''}`} style={{ height: seg(d.feedsOtherMl) }} />
+                  <div className={`relative w-full bg-orange-400 ${topSeg === 'formula' ? 'rounded-t' : ''}`} style={{ height: seg(d.feedsFormulaMl) }} />
+                  <div className={`relative w-full bg-blue-400 ${topSeg === 'breast' ? 'rounded-t' : ''}`} style={{ height: seg(d.feedsBreastMl) }} />
                   {tooltip === d.key && totalMl > 0 && (
                     <div className={`absolute -top-10 ${tipPos} rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-2 py-1 whitespace-nowrap z-10 shadow flex flex-col gap-0.5`}>
                       <span>breast milk {d.feedsBreastMl}ml</span>
