@@ -36,6 +36,10 @@ export function dailySeries(events, days = 7) {
     day.setDate(now.getDate() - i)
     const key = localDayKey(day.toISOString())
 
+    // Local-day window [00:00, next-day 00:00) for splitting overnight sleeps.
+    const dayStart = new Date(day); dayStart.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(dayStart); dayEnd.setDate(dayStart.getDate() + 1)
+
     const dayEvents = events.filter(e => e.extracted && localDayKey(e.timestamp_start) === key)
 
     const isDiaper = e => e.type === 'diaper'
@@ -62,7 +66,9 @@ export function dailySeries(events, days = 7) {
       // pee = wet-only + both; poo = dirty-only + both
       diapersPee: dayEvents.filter(e => isDiaper(e) && (e.data?.kind === 'wet' || e.data?.kind === 'both')).length,
       diapersPoo: dayEvents.filter(e => isDiaper(e) && (e.data?.kind === 'dirty' || e.data?.kind === 'both')).length,
-      sleepHours: totalSleepHours(dayEvents),
+      // Sleep is counted by overlap with this day, so an overnight sleep is
+      // split across the two days it spans (not dumped onto the start day).
+      sleepHours: sleepOverlapHours(events, dayStart.getTime(), dayEnd.getTime()),
     })
   }
   return series
@@ -80,14 +86,19 @@ export function feedMilkCategory(e) {
   return 'other'
 }
 
-// Sum of completed sleep durations (events with both start and end) for a day's events.
-function totalSleepHours(dayEvents) {
+// Total hours of completed sleep that fall within the [dayStartMs, dayEndMs)
+// window. Each sleep interval is clipped to the window, so a sleep crossing
+// midnight contributes only its portion to each day.
+function sleepOverlapHours(events, dayStartMs, dayEndMs) {
   let ms = 0
-  for (const e of dayEvents) {
-    if (e.type === 'sleep' && e.timestamp_start && e.timestamp_end) {
-      const dur = new Date(e.timestamp_end) - new Date(e.timestamp_start)
-      if (dur > 0) ms += dur
-    }
+  for (const e of events) {
+    if (!e.extracted || e.type !== 'sleep' || !e.timestamp_start || !e.timestamp_end) continue
+    const s = new Date(e.timestamp_start).getTime()
+    const en = new Date(e.timestamp_end).getTime()
+    if (!(en > s)) continue
+    const lo = Math.max(s, dayStartMs)
+    const hi = Math.min(en, dayEndMs)
+    if (hi > lo) ms += hi - lo
   }
   return Math.round((ms / 3_600_000) * 10) / 10
 }
