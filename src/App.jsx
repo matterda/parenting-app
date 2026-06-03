@@ -135,6 +135,24 @@ export default function App() {
     setTab('History')
   }
 
+  // Retry extraction on an existing raw entry from History. Reuses the raw
+  // record as the placeholder, so confirming replaces it with structured events.
+  async function handleRetryRaw(ev) {
+    if (!ev.raw_text) return
+    setPendingId(ev.id)
+    setPendingText(ev.raw_text)
+    setPhase('extracting')
+    setTab('Log')
+    try {
+      const result = await extractEvents(ev.raw_text, activeSleep?.timestamp_start ?? null)
+      setExtracted(result)
+      setPhase('confirming')
+    } catch (err) {
+      setErrorMsg(err.message)
+      setPhase('error')
+    }
+  }
+
   // Re-run extraction with edited note text (keeps same placeholder ID)
   async function handleReextract(newText) {
     setPendingText(newText)
@@ -272,7 +290,7 @@ export default function App() {
           <div className="flex flex-col gap-4">
             <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950 p-4 text-sm text-red-700 dark:text-red-300">
               <strong>Extraction failed:</strong> {errorMsg}
-              <br />Your note was saved as raw text.
+              <br />Your note was kept as a <strong>raw entry</strong> in History — open it there to retry extraction or edit it by hand. It won't be counted in trends until extracted.
             </div>
             <button
               onClick={reset}
@@ -310,7 +328,7 @@ export default function App() {
         )}
 
         {phase === 'idle' && tab === 'History' && (
-          <EventList events={events} onDelete={handleDelete} onEdit={handleEdit} onCreate={handleCreate} />
+          <EventList events={events} onDelete={handleDelete} onEdit={handleEdit} onCreate={handleCreate} onRetryRaw={handleRetryRaw} />
         )}
 
         {phase === 'idle' && tab === 'Trends' && (
