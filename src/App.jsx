@@ -14,6 +14,7 @@ import Settings from './components/Settings'
 import ActiveSleepBanner, { LastSleepBanner } from './components/ActiveSleepBanner'
 import FeedOverdueBanner from './components/FeedOverdueBanner'
 import OutstandingLogs from './components/OutstandingLogs'
+import QuickLog from './components/QuickLog'
 import ReportView from './components/ReportView'
 
 const TABS = ['Log', 'History', 'Trends', 'Report', 'Settings']
@@ -319,8 +320,9 @@ export default function App() {
               )
             })()}
             <FeedOverdueBanner events={events} />
+            <QuickLog onCreate={handleCreate} onEdit={handleEdit} />
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Describe what happened in plain language. Tap the mic on your keyboard to dictate.
+              Or describe what happened in plain language. Tap the mic on your keyboard to dictate.
             </p>
             <LogInput key={prefilledText} defaultValue={prefilledText} onAdd={handleAdd} />
             <OutstandingLogs events={events} onEdit={handleEdit} />
