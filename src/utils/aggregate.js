@@ -61,7 +61,10 @@ export function dailySeries(events, days = 7) {
       feedsBreastMl: volSum(breastFeeds),
       feedsFormulaMl: volSum(formulaFeeds),
       feedsOtherMl: volSum(otherFeeds),
-      pumpings: pumpEvents.length,
+      // Count breasts pumped, not sessions: a 'both' log counts as 2, a
+      // single-side (or unspecified) log as 1 — so two single-breast logs
+      // weigh the same as one log covering both breasts.
+      pumpingsBreasts: pumpEvents.reduce((s, e) => s + (e.data?.side === 'both' ? 2 : 1), 0),
       pumpingsVolumeMl: pumpEvents.reduce((s, e) => s + (Number(e.data?.volume_ml) || 0), 0),
       // pee = wet-only + both; poo = dirty-only + both
       diapersPee: dayEvents.filter(e => isDiaper(e) && (e.data?.kind === 'wet' || e.data?.kind === 'both')).length,

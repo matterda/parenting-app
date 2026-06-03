@@ -47,7 +47,7 @@ export default function TrendView({ events }) {
         <GroupedBarRow
           title="Pumping / day"
           series={series}
-          fieldA="pumpings" labelA="count" colorA="bg-rose-400"
+          fieldA="pumpingsBreasts" labelA="breasts" colorA="bg-rose-400"
           fieldB="pumpingsVolumeMl" labelB="ml" colorB="bg-rose-200 dark:bg-rose-800"
           unitB="ml"
         />
