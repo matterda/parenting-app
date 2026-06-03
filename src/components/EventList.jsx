@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { eventToText } from '../utils/eventToText'
 import EditEntry from './EditEntry'
+import DayTimeline from './DayTimeline'
 
 const TYPE_COLORS = {
   feed: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
@@ -21,16 +22,45 @@ const TYPE_LABELS = {
   pumping: 'pumping', note: 'note', question_for_pediatrician: 'question',
 }
 
-export default function EventList({ events, onDelete, onEdit }) {
+export default function EventList({ events, onDelete, onEdit, onCreate }) {
   // Set of selected type filters; empty = show all. A non-extracted event
   // matches the 'raw' filter.
   const [selected, setSelected] = useState(() => new Set())
+  const [view, setView] = useState('list') // 'list' | 'timeline'
+
+  const viewToggle = (
+    <div className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5 self-end">
+      {['list', 'timeline'].map(v => (
+        <button
+          key={v}
+          onClick={() => setView(v)}
+          className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+            view === v ? 'bg-white dark:bg-gray-900 text-violet-600 dark:text-violet-400 shadow-sm' : 'text-gray-500 dark:text-gray-400'
+          }`}
+        >
+          {v === 'list' ? 'List' : 'Timeline'}
+        </button>
+      ))}
+    </div>
+  )
+
+  if (view === 'timeline') {
+    return (
+      <div className="flex flex-col gap-3">
+        {viewToggle}
+        <DayTimeline events={events} onCreate={onCreate} onEdit={onEdit} onDelete={onDelete} />
+      </div>
+    )
+  }
 
   if (events.length === 0) {
     return (
-      <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-8">
-        No entries yet — log something above.
-      </p>
+      <div className="flex flex-col gap-3">
+        {viewToggle}
+        <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-8">
+          No entries yet — log something above.
+        </p>
+      </div>
     )
   }
 
@@ -50,6 +80,7 @@ export default function EventList({ events, onDelete, onEdit }) {
 
   return (
     <div className="flex flex-col gap-3">
+      {viewToggle}
       {/* Filter chips — multi-select; "All" clears the selection */}
       <div className="flex flex-wrap gap-1.5">
         <FilterChip label="All" active={selected.size === 0} onClick={() => setSelected(new Set())} />

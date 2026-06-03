@@ -201,6 +201,14 @@ export default function App() {
     await refreshEvents()
   }
 
+  // Non-LLM create path used by the day-timeline editor: insert one structured
+  // event at a chosen time, then return it so the timeline can open its editor.
+  async function handleCreate(ev) {
+    const [saved] = await addImportedEvents([ev])
+    await refreshEvents()
+    return saved
+  }
+
   async function refreshEvents() {
     const all = await getAllEvents()
     setEvents(all)
@@ -302,7 +310,7 @@ export default function App() {
         )}
 
         {phase === 'idle' && tab === 'History' && (
-          <EventList events={events} onDelete={handleDelete} onEdit={handleEdit} />
+          <EventList events={events} onDelete={handleDelete} onEdit={handleEdit} onCreate={handleCreate} />
         )}
 
         {phase === 'idle' && tab === 'Trends' && (
