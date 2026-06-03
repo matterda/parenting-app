@@ -327,16 +327,14 @@ function FeedMilkBarRow({ title, series }) {
             return (
               <div key={d.key} className="flex-1 flex flex-col items-center gap-1">
                 <div
-                  className="relative w-full cursor-pointer hover:opacity-75 transition-opacity"
+                  className="relative w-full flex flex-col justify-end cursor-pointer hover:opacity-75 transition-opacity"
                   style={{ height: TRACK_PX }}
                   onClick={() => setTooltip(tooltip === d.key ? null : d.key)}
                 >
                   <Gridlines />
-                  <div className="absolute inset-x-0 bottom-0 flex flex-col justify-end overflow-hidden rounded-t" style={{ height: TRACK_PX }}>
-                    <div className="relative w-full bg-gray-300 dark:bg-gray-600" style={{ height: seg(d.feedsOtherMl) }} />
-                    <div className="relative w-full bg-orange-400" style={{ height: seg(d.feedsFormulaMl) }} />
-                    <div className="relative w-full bg-blue-400" style={{ height: seg(d.feedsBreastMl) }} />
-                  </div>
+                  <div className="relative w-full rounded-t bg-gray-300 dark:bg-gray-600" style={{ height: seg(d.feedsOtherMl) }} />
+                  <div className="relative w-full rounded-t bg-orange-400" style={{ height: seg(d.feedsFormulaMl) }} />
+                  <div className="relative w-full rounded-t bg-blue-400" style={{ height: seg(d.feedsBreastMl) }} />
                   {tooltip === d.key && totalMl > 0 && (
                     <div className={`absolute -top-10 ${tipPos} rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-2 py-1 whitespace-nowrap z-10 shadow flex flex-col gap-0.5`}>
                       <span>breast milk {d.feedsBreastMl}ml</span>
