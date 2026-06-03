@@ -4,7 +4,7 @@ import { extractEvents } from './api'
 import { toLocalISO } from './utils/time'
 import { scheduleCheck } from './notifications'
 import { syncPull, syncPush, syncDelete, syncServerTime } from './sync'
-import { saveSnapshot } from './utils/snapshots'
+import { saveSnapshot, saveDailySnapshot } from './utils/snapshots'
 import { lastOfType } from './utils/aggregate'
 import LogInput from './components/LogInput'
 import EventList from './components/EventList'
@@ -45,6 +45,7 @@ export default function App() {
       setEvents(evs)
       scheduleCheck(evs)
       saveSnapshot(evs)
+      saveDailySnapshot(evs)
     }
     init()
   }, [])
@@ -233,6 +234,7 @@ export default function App() {
     setEvents(all)
     scheduleCheck(all)
     saveSnapshot(all)
+    saveDailySnapshot(all)
     syncPush(all)
   }
 

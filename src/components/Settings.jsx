@@ -3,7 +3,7 @@ import { getAllEvents, clearAllEvents, upsertEvent, addImportedEvents } from '..
 import { parseEventsCsv, CSV_TEMPLATE } from '../utils/importCsv'
 import { getTheme, applyTheme } from '../theme'
 import { getNotifSettings, saveNotifSettings, requestPermission } from '../notifications'
-import { listSnapshots, getSnapshotData } from '../utils/snapshots'
+import { listSnapshots, getSnapshotData, listDailySnapshots, getDailySnapshotData } from '../utils/snapshots'
 import {
   listRestorePoints,
   reconstructAt,
@@ -43,6 +43,8 @@ export default function Settings({ onNotifSettingsChanged, onRestore }) {
   const [notif, setNotif] = useState(getNotifSettings)
   const [permState, setPermState] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'))
   const [snapshots, setSnapshots] = useState(listSnapshots)
+  const [dailySnapshots, setDailySnapshots] = useState(listDailySnapshots)
+  const [restoringDaily, setRestoringDaily] = useState(null)
   const [restoring, setRestoring] = useState(null)
 
   // Operation-log recovery
@@ -127,6 +129,18 @@ export default function Settings({ onNotifSettingsChanged, onRestore }) {
     onRestore?.()
     setRestoring(null)
     setSnapshots(listSnapshots())
+  }
+
+  async function handleRestoreDaily(index) {
+    if (restoringDaily != null) return
+    if (!window.confirm('Restore this daily backup? Current data will be replaced.')) return
+    setRestoringDaily(index)
+    const data = await getDailySnapshotData(index)
+    await clearAllEvents()
+    for (const ev of data) await upsertEvent(ev)
+    onRestore?.()
+    setRestoringDaily(null)
+    setDailySnapshots(listDailySnapshots())
   }
 
   // ── Operation-log recovery ──────────────────────────────────────────────
@@ -524,6 +538,39 @@ export default function Settings({ onNotifSettingsChanged, onRestore }) {
                   className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 transition"
                 >
                   {restoring === s.index ? 'Restoring…' : 'Restore'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <hr className="border-gray-100 dark:border-gray-800" />
+
+      {/* Daily backups */}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Daily backups</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          Once per day the app saves a compressed snapshot on this device, keeping the last 30 days. A longer-horizon safety net than the rolling snapshots above.
+        </p>
+        {dailySnapshots.length === 0 ? (
+          <p className="text-xs text-gray-300 dark:text-gray-600">No daily backups yet — they start after your first launch.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {dailySnapshots.map(s => (
+              <li key={s.index} className="flex items-center justify-between rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-2.5 shadow-sm">
+                <div>
+                  <p className="text-sm text-gray-700 dark:text-gray-200">
+                    {new Date(s.day + 'T00:00:00').toLocaleDateString([], { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">{s.count} entries</p>
+                </div>
+                <button
+                  onClick={() => handleRestoreDaily(s.index)}
+                  disabled={restoringDaily != null}
+                  className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 transition"
+                >
+                  {restoringDaily === s.index ? 'Restoring…' : 'Restore'}
                 </button>
               </li>
             ))}
