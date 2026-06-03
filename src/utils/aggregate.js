@@ -124,6 +124,45 @@ export function weightSeries(events) {
     })
 }
 
+// Recent (default last 24h) extracted events that are missing details worth
+// filling in. Returns [{ event, reasons[] }] newest-first. Notes/milestones
+// and legitimately-empty fields (e.g. a breast feed has no volume) are not
+// flagged. Events the model itself flagged (needs_confirmation) are surfaced.
+export function incompleteEvents(events, withinHours = 24) {
+  const cutoff = Date.now() - withinHours * 3_600_000
+  const out = []
+
+  for (const e of events) {
+    if (!e.extracted || !e.timestamp_start) continue
+    if (new Date(e.timestamp_start).getTime() < cutoff) continue
+
+    const d = e.data ?? {}
+    const reasons = []
+
+    if (e.type === 'feed') {
+      if (!d.method) reasons.push('feed type')
+      else if (d.method === 'bottle') {
+        if (d.volume_ml == null) reasons.push('volume')
+        if (!d.milk_type) reasons.push('milk type')
+      }
+    } else if (e.type === 'pumping') {
+      if (d.volume_ml == null) reasons.push('volume')
+      if (d.duration_min == null) reasons.push('duration')
+    } else if (e.type === 'diaper') {
+      if (!d.kind) reasons.push('wet/dirty')
+    }
+
+    if (Array.isArray(e.needs_confirmation) && e.needs_confirmation.length > 0) {
+      reasons.push('needs review')
+    }
+
+    if (reasons.length > 0) out.push({ event: e, reasons })
+  }
+
+  out.sort((a, b) => new Date(b.event.timestamp_start) - new Date(a.event.timestamp_start))
+  return out
+}
+
 export function relativeTime(iso) {
   if (!iso) return '—'
   const diff = Date.now() - new Date(iso).getTime()
