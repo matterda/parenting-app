@@ -14,6 +14,8 @@ export default function EchoLoop({ events, rawText, adviceRequested, onConfirm, 
       const next = prev.map((ev, i) => i === evIndex ? { ...ev, data: { ...ev.data } } : ev)
       if (field === 'timestamp_start' || field === 'timestamp_end') {
         next[evIndex] = { ...next[evIndex], [field]: toISO(next[evIndex][field], value) }
+      } else if (field === 'type') {
+        next[evIndex] = { ...next[evIndex], type: value }
       } else {
         next[evIndex].data[field] = value
       }
@@ -106,9 +108,11 @@ function EventCard({ event, onFieldChange }) {
       event.confidence === 'low' ? 'border-amber-300 dark:border-amber-700' : 'border-gray-100 dark:border-gray-800'
     }`}>
       <div className="flex items-start gap-2">
-        <span className="shrink-0 rounded-md bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
-          {event.type}
-        </span>
+        <TypeChip
+          type={event.type}
+          needsConfirm={needsConfirm.has('type')}
+          onChange={val => onFieldChange('type', val)}
+        />
         <p className="font-medium text-gray-800 dark:text-gray-100 text-sm">{eventToText(event)}</p>
       </div>
 
@@ -131,6 +135,45 @@ function EventCard({ event, onFieldChange }) {
         </div>
       )}
     </div>
+  )
+}
+
+// All event types the user can pick from when correcting a misclassification.
+const ALL_TYPES = [
+  'feed', 'pumping', 'sleep', 'diaper', 'weight',
+  'temperature', 'medication', 'note', 'milestone', 'question_for_pediatrician',
+]
+
+// The event-type badge, tappable to correct a misclassification (e.g. pumping
+// logged as a breast feed). Highlighted amber when the model flagged the type.
+function TypeChip({ type, needsConfirm, onChange }) {
+  const [editing, setEditing] = useState(false)
+
+  if (editing) {
+    return (
+      <select
+        autoFocus
+        className="shrink-0 rounded-md border border-violet-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-1.5 py-0.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-violet-400"
+        value={type ?? ''}
+        onChange={e => { onChange(e.target.value); setEditing(false) }}
+        onBlur={() => setEditing(false)}
+      >
+        {ALL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+      </select>
+    )
+  }
+
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold transition ${
+        needsConfirm
+          ? 'bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700'
+          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+      }`}
+    >
+      {type} ▾
+    </button>
   )
 }
 

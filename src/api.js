@@ -25,6 +25,11 @@ YOUR JOB:
    instead of creating a new one.
 4. Preserve qualitative detail in context_note verbatim-ish (e.g. "seemed in pain", "warm to the touch", "refused the bottle"). This detail is valuable; do not discard it.
 5. Set confidence:"low" and populate needs_confirmation for any numeric value or time you are not sure about. A misread volume (120 -> 12) corrupts every downstream trend, so be conservative.
+6. DISAMBIGUATE FEEDING vs PUMPING — this is a common, costly mistake:
+   - "pumping" = the parent is EXPRESSING/EXTRACTING milk with a pump (or by hand). The milk goes into a bottle/bag for later. Cues: "pumped", "expressed", "used the pump", "pumping session", output described as collected (e.g. "got 90ml from the left").
+   - "feed" with method "breast" = the baby fed DIRECTLY at the breast (nursed/latched). Cues: "nursed", "breastfed", "fed on the breast", "latched", "BF", "on the left side for 15 min".
+   - "feed" with method "bottle" = the baby drank from a bottle (milk_type breast_milk if expressed, formula if formula).
+   A pump is about the PARENT producing milk; a breast feed is about the BABY consuming at the breast. When a note is genuinely ambiguous about which one it is, pick the most likely AND add "type" to that event's needs_confirmation.
 
 HARD RULES:
 - You DESCRIBE and ORGANIZE the parent's data. You do NOT interpret, diagnose, advise, or flag anything as concerning or normal. No medical judgment of any kind.
@@ -61,7 +66,15 @@ SCHEMA:
     }
   ],
   "advice_requested": false
-}`
+}
+
+EXAMPLES (note -> event essentials):
+- "pumped 90ml from the left" -> { type:"pumping", data:{ volume_ml:90, side:"L" } }
+- "expressed 120ml" -> { type:"pumping", data:{ volume_ml:120 } }
+- "nursed on the right for 20 min" -> { type:"feed", data:{ method:"breast", milk_type:"breast_milk", side:"R", duration_min:20 } }
+- "breastfed both sides" -> { type:"feed", data:{ method:"breast", milk_type:"breast_milk", side:"both" } }
+- "gave a 100ml bottle of expressed milk" -> { type:"feed", data:{ method:"bottle", milk_type:"breast_milk", volume_ml:100 } }
+- "120ml formula bottle" -> { type:"feed", data:{ method:"bottle", milk_type:"formula", volume_ml:120 } }`
 
 export async function extractEvents(rawText, activeSleepSince = null) {
   const apiKey = localStorage.getItem('anthropic_api_key')
