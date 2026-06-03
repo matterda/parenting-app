@@ -1,34 +1,38 @@
 import { useState } from 'react'
 import { toLocalISO } from '../utils/time'
-import { eventToText } from '../utils/eventToText'
 import EditEntry from './EditEntry'
 
-// One-tap buttons that bypass the LLM: each creates a structured event at the
-// current time, then opens the inline editor so details can be refined.
+// One-tap buttons that bypass the LLM. Tapping opens a draft editor at the
+// current time; nothing is written to the DB until "Save" is pressed.
 const BUTTONS = [
-  { key: 'wet',     label: '💧 Wet',     type: 'diaper',  data: { kind: 'wet' },   color: 'bg-yellow-500 hover:bg-yellow-600' },
-  { key: 'dirty',   label: '💩 Dirty',   type: 'diaper',  data: { kind: 'dirty' }, color: 'bg-amber-700 hover:bg-amber-800' },
-  { key: 'both',    label: 'Wet+Dirty',  type: 'diaper',  data: { kind: 'both' },  color: 'bg-amber-600 hover:bg-amber-700' },
-  { key: 'feed',    label: '🍼 Feed',    type: 'feed',    data: {},                color: 'bg-blue-500 hover:bg-blue-600' },
-  { key: 'pumping', label: '🤱 Pumping', type: 'pumping', data: {},                color: 'bg-rose-500 hover:bg-rose-600' },
+  { key: 'diaper',  label: '🧷 Diaper',  type: 'diaper',  color: 'bg-yellow-500 hover:bg-yellow-600' },
+  { key: 'feed',    label: '🍼 Feed',    type: 'feed',    color: 'bg-blue-500 hover:bg-blue-600' },
+  { key: 'pumping', label: '🤱 Pumping', type: 'pumping', color: 'bg-rose-500 hover:bg-rose-600' },
 ]
 
-export default function QuickLog({ onCreate, onEdit }) {
-  const [editing, setEditing] = useState(null) // the freshly-created event
+const TYPE_LABELS = { diaper: 'diaper', feed: 'feed', pumping: 'pumping' }
 
-  async function handleTap(btn) {
-    const ev = {
+export default function QuickLog({ onCreate }) {
+  const [draft, setDraft] = useState(null) // unsaved in-memory event
+
+  function startDraft(btn) {
+    setDraft({
       type: btn.type,
       timestamp_start: toLocalISO(new Date()),
       timestamp_end: null,
-      data: { ...btn.data },
+      data: {},
       context_note: null,
       raw_text: null,
       confidence: 'high',
       needs_confirmation: [],
-    }
-    const saved = await onCreate(ev)
-    if (saved) setEditing(saved)
+      extracted: true,
+    })
+  }
+
+  // EditEntry returns a patch; merge it onto the draft and persist.
+  async function handleSave(patch) {
+    await onCreate({ ...draft, ...patch })
+    setDraft(null)
   }
 
   return (
@@ -37,29 +41,23 @@ export default function QuickLog({ onCreate, onEdit }) {
         {BUTTONS.map(btn => (
           <button
             key={btn.key}
-            onClick={() => handleTap(btn)}
-            className={`rounded-xl px-3 py-2 text-sm font-semibold text-white shadow-sm transition ${btn.color}`}
+            onClick={() => startDraft(btn)}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm transition ${btn.color}`}
           >
             {btn.label}
           </button>
         ))}
       </div>
 
-      {editing && (
+      {draft && (
         <div className="rounded-xl border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-              Logged: {eventToText(editing)}
-            </p>
-            <span className="text-xs text-gray-400 dark:text-gray-500">
-              {new Date(editing.timestamp_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          </div>
-          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Add details, or just close — it's already saved.</p>
+          <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+            New {TYPE_LABELS[draft.type]} — fill in details, then Save
+          </p>
           <EditEntry
-            ev={editing}
-            onSave={patch => { onEdit(editing.id, patch); setEditing(null) }}
-            onCancel={() => setEditing(null)}
+            ev={draft}
+            onSave={handleSave}
+            onCancel={() => setDraft(null)}
           />
         </div>
       )}

@@ -320,7 +320,7 @@ export default function App() {
               )
             })()}
             <FeedOverdueBanner events={events} />
-            <QuickLog onCreate={handleCreate} onEdit={handleEdit} />
+            <QuickLog onCreate={handleCreate} />
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Or describe what happened in plain language. Tap the mic on your keyboard to dictate.
             </p>
