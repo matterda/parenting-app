@@ -153,6 +153,7 @@ export function incompleteEvents(events, withinHours = 24) {
     } else if (e.type === 'pumping') {
       if (d.volume_ml == null) reasons.push('volume')
       if (d.duration_min == null) reasons.push('duration')
+      if (!d.side) reasons.push('breast (L/R/both)')
     } else if (e.type === 'diaper') {
       if (!d.kind) reasons.push('wet/dirty')
     }
