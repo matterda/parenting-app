@@ -127,7 +127,9 @@ export function weightSeries(events) {
 // Recent (default last 24h) extracted events that are missing details worth
 // filling in. Returns [{ event, reasons[] }] newest-first. Notes/milestones
 // and legitimately-empty fields (e.g. a breast feed has no volume) are not
-// flagged. Events the model itself flagged (needs_confirmation) are surfaced.
+// flagged. Only concrete missing fields are flagged — the model's
+// needs_confirmation hints are intentionally ignored (too noisy, e.g. it tags
+// the end time on every completed sleep).
 export function incompleteEvents(events, withinHours = 24) {
   const cutoff = Date.now() - withinHours * 3_600_000
   const out = []
@@ -150,10 +152,6 @@ export function incompleteEvents(events, withinHours = 24) {
       if (d.duration_min == null) reasons.push('duration')
     } else if (e.type === 'diaper') {
       if (!d.kind) reasons.push('wet/dirty')
-    }
-
-    if (Array.isArray(e.needs_confirmation) && e.needs_confirmation.length > 0) {
-      reasons.push('needs review')
     }
 
     if (reasons.length > 0) out.push({ event: e, reasons })

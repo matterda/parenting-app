@@ -293,11 +293,11 @@ export default function App() {
               )
             })()}
             <FeedOverdueBanner events={events} />
-            <OutstandingLogs events={events} onEdit={handleEdit} />
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Describe what happened in plain language. Tap the mic on your keyboard to dictate.
             </p>
             <LogInput key={prefilledText} defaultValue={prefilledText} onAdd={handleAdd} />
+            <OutstandingLogs events={events} onEdit={handleEdit} />
           </section>
         )}
 
