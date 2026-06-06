@@ -23,7 +23,9 @@ YOUR JOB:
    output a sleep event with timestamp_start = active_sleep_since and timestamp_end = the resolved
    wake time. Set "closes_active_sleep": true on that event so the app can update the existing record
    instead of creating a new one.
-4. Preserve qualitative detail in context_note verbatim-ish (e.g. "seemed in pain", "warm to the touch", "refused the bottle"). This detail is valuable; do not discard it.
+4. context_note is ONLY for extra qualitative detail that is NOT already captured by the structured fields (type, method, side, volume, etc.) — e.g. "seemed in pain", "warm to the touch", "refused the bottle", "fussy afterwards". Preserve such detail verbatim-ish.
+   - If the note contains no information beyond what the structured fields already encode, set context_note to null. Do NOT restate, summarize, label, or translate the event. A bare "breastfeeding" (or its equivalent in any language) must produce context_note: null — NOT "breastfeeding session" or an English translation. When in doubt, prefer null over a redundant note.
+   - Write any context_note in English even if the input is in another language; but only when it carries genuine extra detail.
 5. Set confidence:"low" and populate needs_confirmation for any numeric value or time you are not sure about. A misread volume (120 -> 12) corrupts every downstream trend, so be conservative.
 6. DISAMBIGUATE FEEDING vs PUMPING — this is a common, costly mistake:
    - "pumping" = the parent is EXPRESSING/EXTRACTING milk with a pump (or by hand). The milk goes into a bottle/bag for later. Cues: "pumped", "expressed", "used the pump", "pumping session", output described as collected (e.g. "got 90ml from the left").
@@ -60,7 +62,7 @@ SCHEMA:
         // note:        { }
       },
       "raw_text": "the original phrase this came from",
-      "context_note": "any rich qualitative detail",
+      "context_note": "extra qualitative detail not in the fields, else null",
       "confidence": "high | low",
       "needs_confirmation": ["list of field names the user should verify"]
     }
@@ -74,7 +76,10 @@ EXAMPLES (note -> event essentials):
 - "nursed on the right for 20 min" -> { type:"feed", data:{ method:"breast", milk_type:"breast_milk", side:"R", duration_min:20 } }
 - "breastfed both sides" -> { type:"feed", data:{ method:"breast", milk_type:"breast_milk", side:"both" } }
 - "gave a 100ml bottle of expressed milk" -> { type:"feed", data:{ method:"bottle", milk_type:"breast_milk", volume_ml:100 } }
-- "120ml formula bottle" -> { type:"feed", data:{ method:"bottle", milk_type:"formula", volume_ml:120 } }`
+- "120ml formula bottle" -> { type:"feed", data:{ method:"bottle", milk_type:"formula", volume_ml:120 } }
+- "breastfeeding" -> { type:"feed", data:{ method:"breast", milk_type:"breast_milk" }, context_note:null }   // no extra detail → null, NOT "breastfeeding session"
+- "allattamento al seno" (Italian for breastfeeding) -> { type:"feed", data:{ method:"breast", milk_type:"breast_milk" }, context_note:null }   // do not translate/restate
+- "allattamento, sembrava avere male" -> { type:"feed", data:{ method:"breast", milk_type:"breast_milk" }, context_note:"seemed in pain" }   // keep the genuine extra detail, in English`
 
 export async function extractEvents(rawText, activeSleepSince = null) {
   const apiKey = localStorage.getItem('anthropic_api_key')
