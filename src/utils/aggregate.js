@@ -45,21 +45,25 @@ export function dailySeries(events, days = 7) {
     const isDiaper = e => e.type === 'diaper'
     const feedEvents = dayEvents.filter(e => e.type === 'feed')
     const pumpEvents = dayEvents.filter(e => e.type === 'pumping')
-    const breastFeeds  = feedEvents.filter(e => feedMilkCategory(e) === 'breast')
-    const formulaFeeds = feedEvents.filter(e => feedMilkCategory(e) === 'formula')
-    const otherFeeds   = feedEvents.filter(e => feedMilkCategory(e) === 'other')
+    const breastFeeds      = feedEvents.filter(e => feedMilkCategory(e) === 'breast')
+    const bottleFormula    = feedEvents.filter(e => feedMilkCategory(e) === 'bottle_formula')
+    const bottleBreastmilk = feedEvents.filter(e => feedMilkCategory(e) === 'bottle_breastmilk')
+    const otherFeeds       = feedEvents.filter(e => feedMilkCategory(e) === 'other')
     const volSum = arr => arr.reduce((s, e) => s + (Number(e.data?.volume_ml) || 0), 0)
     series.push({
       key,
       label: day.toLocaleDateString([], { weekday: 'short' }),
       feeds: feedEvents.length,
       feedsVolumeMl: feedEvents.reduce((s, e) => s + (Number(e.data?.volume_ml) || 0), 0),
-      // Feeds split by milk type (counts + volume where known)
+      // Feeds split into 4 categories (counts + volume where known):
+      // direct breast, bottle of formula, bottle of expressed breast milk, other.
       feedsBreast: breastFeeds.length,
-      feedsFormula: formulaFeeds.length,
+      feedsBottleFormula: bottleFormula.length,
+      feedsBottleBreastmilk: bottleBreastmilk.length,
       feedsOther: otherFeeds.length,
       feedsBreastMl: volSum(breastFeeds),
-      feedsFormulaMl: volSum(formulaFeeds),
+      feedsBottleFormulaMl: volSum(bottleFormula),
+      feedsBottleBreastmilkMl: volSum(bottleBreastmilk),
       feedsOtherMl: volSum(otherFeeds),
       // Count breasts pumped, not sessions: a 'both' log counts as 2, a
       // single-side (or unspecified) log as 1 — so two single-breast logs
@@ -77,15 +81,16 @@ export function dailySeries(events, days = 7) {
   return series
 }
 
-// Classify a feed event by milk type:
-//   'breast'  — fed directly at the breast, or a bottle of expressed breast milk
-//   'formula' — a bottle of formula
-//   'other'   — milk type not recorded (or 'mixed')
+// Classify a feed event into one of four categories:
+//   'breast'            — fed directly at the breast
+//   'bottle_formula'    — a bottle of formula
+//   'bottle_breastmilk' — a bottle of expressed breast milk
+//   'other'             — milk type not recorded (or 'mixed')
 export function feedMilkCategory(e) {
   const d = e.data ?? {}
   if (d.method === 'breast') return 'breast'
-  if (d.milk_type === 'breast_milk') return 'breast'
-  if (d.milk_type === 'formula') return 'formula'
+  if (d.milk_type === 'formula') return 'bottle_formula'
+  if (d.milk_type === 'breast_milk') return 'bottle_breastmilk'
   return 'other'
 }
 
@@ -119,6 +124,7 @@ export function weightSeries(events) {
       const value = Number(e.data.value)
       return {
         key: e.id,
+        ts: new Date(e.timestamp_start).getTime(),
         date: new Date(e.timestamp_start).toLocaleDateString([], { month: 'short', day: 'numeric' }),
         value,
         unit,

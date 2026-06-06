@@ -296,19 +296,30 @@ function StackedBarRow({ title, series }) {
 }
 
 // ─── FeedMilkBarRow ───────────────────────────────────────────────────────────
-// Stacked bar of daily feed counts split by milk type: breast milk, formula,
-// and other (milk type not recorded). Tooltip also surfaces volume where known.
+// Stacked bar of daily feed volume split into four categories: direct breast,
+// bottle of expressed breast milk, bottle of formula, and other. Note direct
+// breast feeds usually have no recorded volume, so they contribute little here.
 function FeedMilkBarRow({ title, series }) {
   const [tooltip, setTooltip] = useState(null)
-  const max = Math.max(...series.map(d => d.feedsBreastMl + d.feedsFormulaMl + d.feedsOtherMl), 1)
+  const dayTotal = d => d.feedsBreastMl + d.feedsBottleBreastmilkMl + d.feedsBottleFormulaMl + d.feedsOtherMl
+  const max = Math.max(...series.map(dayTotal), 1)
+
+  // Segments drawn top→bottom; first non-zero from the top gets the rounded cap.
+  const SEGMENTS = [
+    { key: 'other',             field: 'feedsOtherMl',            cls: 'bg-gray-300 dark:bg-gray-600' },
+    { key: 'bottle_formula',    field: 'feedsBottleFormulaMl',    cls: 'bg-orange-400' },
+    { key: 'bottle_breastmilk', field: 'feedsBottleBreastmilkMl', cls: 'bg-sky-400' },
+    { key: 'breast',            field: 'feedsBreastMl',           cls: 'bg-blue-500' },
+  ]
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-1.5">
+      <div className="flex items-center gap-3 mb-1.5 flex-wrap">
         <span className="text-xs text-gray-400 dark:text-gray-500">{title}</span>
-        <span className="flex items-center gap-2 text-[10px] text-gray-400 dark:text-gray-500">
-          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-blue-400" />breast</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-orange-400" />formula</span>
+        <span className="flex items-center gap-2 text-[10px] text-gray-400 dark:text-gray-500 flex-wrap">
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-blue-500" />breast</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-sky-400" />bottle (BM)</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-orange-400" />bottle (formula)</span>
           <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-gray-300 dark:bg-gray-600" />other</span>
         </span>
       </div>
@@ -316,13 +327,11 @@ function FeedMilkBarRow({ title, series }) {
         <YAxis max={max} unit="ml" />
         <div className="flex-1 flex items-start gap-2">
           {series.map((d, i) => {
-            const totalMl = d.feedsBreastMl + d.feedsFormulaMl + d.feedsOtherMl
+            const totalMl = dayTotal(d)
             // Strictly proportional — no per-segment min height, so the stacked
             // total matches the y-axis scale exactly.
             const seg = v => (v / max) * TRACK_PX
-            // Round only the topmost non-zero segment (DOM order top→bottom is
-            // other, formula, breast) so inner segment joins stay square.
-            const topSeg = d.feedsOtherMl > 0 ? 'other' : d.feedsFormulaMl > 0 ? 'formula' : 'breast'
+            const topSeg = SEGMENTS.find(s => d[s.field] > 0)?.key
             // Anchor edge-day tooltips inward so they don't spill off-screen.
             const isFirst = i === 0
             const isLast = i === series.length - 1
@@ -335,13 +344,18 @@ function FeedMilkBarRow({ title, series }) {
                   onClick={() => setTooltip(tooltip === d.key ? null : d.key)}
                 >
                   <Gridlines />
-                  <div className={`relative w-full bg-gray-300 dark:bg-gray-600 ${topSeg === 'other' ? 'rounded-t' : ''}`} style={{ height: seg(d.feedsOtherMl) }} />
-                  <div className={`relative w-full bg-orange-400 ${topSeg === 'formula' ? 'rounded-t' : ''}`} style={{ height: seg(d.feedsFormulaMl) }} />
-                  <div className={`relative w-full bg-blue-400 ${topSeg === 'breast' ? 'rounded-t' : ''}`} style={{ height: seg(d.feedsBreastMl) }} />
+                  {SEGMENTS.map(s => (
+                    <div
+                      key={s.key}
+                      className={`relative w-full ${s.cls} ${topSeg === s.key ? 'rounded-t' : ''}`}
+                      style={{ height: seg(d[s.field]) }}
+                    />
+                  ))}
                   {tooltip === d.key && totalMl > 0 && (
-                    <div className={`absolute -top-10 ${tipPos} rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-2 py-1 whitespace-nowrap z-10 shadow flex flex-col gap-0.5`}>
-                      <span>breast milk {d.feedsBreastMl}ml</span>
-                      <span>formula {d.feedsFormulaMl}ml</span>
+                    <div className={`absolute -top-16 ${tipPos} rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-2 py-1 whitespace-nowrap z-10 shadow flex flex-col gap-0.5`}>
+                      {d.feedsBreastMl > 0 && <span>breast {d.feedsBreastMl}ml</span>}
+                      {d.feedsBottleBreastmilkMl > 0 && <span>bottle (BM) {d.feedsBottleBreastmilkMl}ml</span>}
+                      {d.feedsBottleFormulaMl > 0 && <span>bottle (formula) {d.feedsBottleFormulaMl}ml</span>}
                       {d.feedsOtherMl > 0 && <span>other {d.feedsOtherMl}ml</span>}
                     </div>
                   )}
@@ -358,13 +372,33 @@ function FeedMilkBarRow({ title, series }) {
 }
 
 // ─── WeightPlot ───────────────────────────────────────────────────────────────
+// Scatter plot on a real time axis: dots sit at their actual measurement date,
+// so gaps between weigh-ins are visible (unlike evenly-spaced bars).
 function WeightPlot({ weights }) {
   const [tooltip, setTooltip] = useState(null)
-  // Scale by kg-normalised values so 3000g and 3kg plot at the same height
+  // Scale by kg-normalised values so 3000g and 3kg plot at the same height.
   const kgValues = weights.map(w => w.valueKg)
   const min   = Math.min(...kgValues)
   const max   = Math.max(...kgValues)
   const range = max - min || 1
+
+  const tValues = weights.map(w => w.ts)
+  const tMin = Math.min(...tValues)
+  const tMax = Math.max(...tValues)
+  const tRange = tMax - tMin || 1
+  const single = weights.length === 1
+
+  const xPct = ts => (single ? 50 : ((ts - tMin) / tRange) * 100)
+  const yPx  = kg => Math.max(((kg - min) / range) * (TRACK_PX - 16) + 8, 6)
+
+  const fmt = ms => new Date(ms).toLocaleDateString([], { month: 'short', day: 'numeric' })
+  const xTicks = single
+    ? [{ pct: 50, label: fmt(tMin) }]
+    : [
+        { pct: 0,   label: fmt(tMin) },
+        { pct: 50,  label: fmt(tMin + tRange / 2) },
+        { pct: 100, label: fmt(tMax) },
+      ]
 
   return (
     <div className="flex items-start gap-1">
@@ -379,30 +413,39 @@ function WeightPlot({ weights }) {
           </span>
         ))}
       </div>
-      <div className="flex-1 flex items-start gap-2">
-        {weights.map(w => {
-          const px = Math.max(((w.valueKg - min) / range) * (TRACK_PX - 12) + 12, 8)
-          return (
-            <div key={w.key} className="flex-1 flex flex-col items-center gap-1">
-              <div className="relative w-full flex items-end justify-center" style={{ height: TRACK_PX }}>
-                <Gridlines />
-                <div
-                  className="relative w-full rounded-t bg-green-400 cursor-pointer hover:opacity-75 transition-opacity"
-                  style={{ height: px }}
-                  onClick={() => setTooltip(tooltip === w.key ? null : w.key)}
-                >
-                  {tooltip === w.key && (
-                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-1.5 py-0.5 whitespace-nowrap z-10 shadow">
-                      {w.value}{w.unit}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="text-[10px] text-gray-500 dark:text-gray-400">{w.value}{w.unit}</div>
-              <div className="text-[10px] text-gray-500 dark:text-gray-400">{w.date}</div>
-            </div>
-          )
-        })}
+      <div className="flex-1">
+        {/* Plot area */}
+        <div className="relative w-full" style={{ height: TRACK_PX }}>
+          <Gridlines />
+          {weights.map(w => (
+            <button
+              key={w.key}
+              onClick={() => setTooltip(tooltip === w.key ? null : w.key)}
+              className="absolute h-2.5 w-2.5 -translate-x-1/2 translate-y-1/2 rounded-full bg-green-500 ring-2 ring-white dark:ring-gray-900 cursor-pointer hover:scale-125 transition-transform"
+              style={{ left: `${xPct(w.ts)}%`, bottom: `${yPx(w.valueKg)}px` }}
+            >
+              {tooltip === w.key && (
+                <span className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-1.5 py-0.5 whitespace-nowrap z-10 shadow">
+                  {w.value}{w.unit} · {w.date}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        {/* X axis (time) */}
+        <div className="relative mt-1 h-3">
+          {xTicks.map((t, i) => (
+            <span
+              key={i}
+              className={`absolute text-[9px] text-gray-500 dark:text-gray-400 leading-none ${
+                t.pct === 0 ? '' : t.pct === 100 ? '-translate-x-full' : '-translate-x-1/2'
+              }`}
+              style={{ left: `${t.pct}%` }}
+            >
+              {t.label}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   )
