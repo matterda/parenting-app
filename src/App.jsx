@@ -15,6 +15,8 @@ import ActiveSleepBanner, { LastSleepBanner } from './components/ActiveSleepBann
 import FeedOverdueBanner from './components/FeedOverdueBanner'
 import OutstandingLogs from './components/OutstandingLogs'
 import QuickLog from './components/QuickLog'
+import WeighInCard from './components/WeighInCard'
+import { computeWeighEstimate } from './utils/weighFeed'
 import ReportView from './components/ReportView'
 
 const TABS = ['Log', 'History', 'Trends', 'Report', 'Settings']
@@ -229,6 +231,53 @@ export default function App() {
     return saved
   }
 
+  // Record a clothed weigh-in, then estimate the volume of any breastfeed(s)
+  // since the last valid baseline and auto-write it onto those feeds.
+  async function handleWeighIn({ value, unit }) {
+    const [saved] = await addImportedEvents([{
+      type: 'weighin',
+      timestamp_start: toLocalISO(new Date()),
+      timestamp_end: null,
+      data: { value, unit, clothed: true },
+      context_note: null,
+      raw_text: null,
+      confidence: 'high',
+      needs_confirmation: [],
+    }])
+
+    const all = await getAllEvents()
+    const result = computeWeighEstimate(all, saved)
+
+    if (result.status === 'ok' && result.deltaG > 0) {
+      for (const f of result.feeds) {
+        if (f.volume_ml == null) continue
+        const feed = all.find(e => e.id === f.id)
+        await updateEvent(f.id, {
+          data: {
+            ...(feed?.data ?? {}),
+            volume_ml: f.volume_ml,
+            volume_source: 'weighed',
+            volume_estimated: true,
+            volume_split: f.split,
+            weighin_before_id: result.baselineId,
+            weighin_after_id: saved.id,
+          },
+        })
+      }
+      await updateEvent(saved.id, {
+        data: { value, unit, clothed: true, delta_g: Math.round(result.deltaG), paired_id: result.baselineId, feed_ids: result.feeds.map(f => f.id) },
+      })
+    } else if (result.status === 'no_feed' || result.status === 'invalid') {
+      // Keep the raw delta on the record where one exists, for later analysis.
+      if (result.deltaG != null) {
+        await updateEvent(saved.id, { data: { value, unit, clothed: true, delta_g: Math.round(result.deltaG), paired_id: result.baselineId ?? null } })
+      }
+    }
+
+    await refreshEvents()
+    return result
+  }
+
   async function refreshEvents() {
     const all = await getAllEvents()
     setEvents(all)
@@ -323,6 +372,7 @@ export default function App() {
             })()}
             <FeedOverdueBanner events={events} />
             <QuickLog onCreate={handleCreate} />
+            <WeighInCard events={events} onWeighIn={handleWeighIn} />
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Or describe what happened in plain language. Tap the mic on your keyboard to dictate.
             </p>

@@ -120,6 +120,10 @@ function TypeFields({ type, data, setField }) {
       {num('value', 'Value', '3.5')}
       {sel('unit', 'Unit', ['kg', 'g', 'lb', 'oz'])}
     </div>
+    case 'weighin': return <div className="flex flex-wrap gap-3">
+      {num('value', 'Weight (clothed)', '6.42')}
+      {sel('unit', 'Unit', ['kg', 'g', 'lb', 'oz'])}
+    </div>
     case 'temperature': return <div className="flex flex-wrap gap-3">
       {num('value', 'Value', '37.0')}
       {sel('unit', 'Unit', ['C', 'F'])}

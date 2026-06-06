@@ -7,7 +7,7 @@ export function eventToText(event) {
 
   switch (event.type) {
     case 'feed': {
-      const vol = d.volume_ml != null ? ` ${d.volume_ml}ml` : ''
+      const vol = d.volume_ml != null ? (d.volume_estimated ? ` ~${d.volume_ml}ml est.` : ` ${d.volume_ml}ml`) : ''
       const dur = d.duration_min != null ? ` for ${d.duration_min} min` : ''
       const side = d.side && d.side !== 'null' ? ` (${d.side} side)` : ''
       let source
@@ -38,6 +38,10 @@ export function eventToText(event) {
     }
     case 'weight':
       return `${d.value} ${d.unit} · ${time}`
+    case 'weighin': {
+      const delta = d.delta_g != null ? ` → ${d.delta_g > 0 ? '+' : ''}${d.delta_g} g` : ''
+      return `${d.value} ${d.unit} (clothed)${delta} · ${time}`
+    }
     case 'temperature':
       return `${d.value}°${d.unit} · ${time}`
     case 'medication':

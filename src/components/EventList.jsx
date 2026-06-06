@@ -8,6 +8,7 @@ const TYPE_COLORS = {
   sleep: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
   diaper: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
   weight: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+  weighin: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
   temperature: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
   medication: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
   milestone: 'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300',
@@ -20,6 +21,7 @@ const TYPE_LABELS = {
   feed: 'feed', sleep: 'sleep', diaper: 'diaper', weight: 'weight',
   temperature: 'temp', medication: 'meds', milestone: 'milestone',
   pumping: 'pumping', note: 'note', question_for_pediatrician: 'question',
+  weighin: 'weigh-in',
 }
 
 export default function EventList({ events, onDelete, onEdit, onCreate, onRetryRaw }) {
