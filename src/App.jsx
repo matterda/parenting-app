@@ -19,8 +19,9 @@ import WeighInCard from './components/WeighInCard'
 import Reminders from './components/Reminders'
 import { computeWeighEstimate } from './utils/weighFeed'
 import ReportView from './components/ReportView'
+import AskView from './components/AskView'
 
-const TABS = ['Log', 'History', 'Trends', 'Report', 'Settings']
+const TABS = ['Log', 'History', 'Trends', 'Report', 'Ask', 'Settings']
 
 function getActiveSleep(events) {
   return events.find(e => e.extracted && e.type === 'sleep' && !e.timestamp_end) ?? null
@@ -393,6 +394,10 @@ export default function App() {
 
         {phase === 'idle' && tab === 'Report' && (
           <ReportView events={events} />
+        )}
+
+        {phase === 'idle' && tab === 'Ask' && (
+          <AskView events={events} />
         )}
 
         {phase === 'idle' && tab === 'Settings' && (
