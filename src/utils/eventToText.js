@@ -48,6 +48,10 @@ export function eventToText(event) {
       return `${d.name}${d.dose ? ` ${d.dose}` : ''} · ${time}`
     case 'milestone':
       return `${d.label} · ${time}`
+    case 'reminder': {
+      const status = event.timestamp_end ? `done ${formatTime(event.timestamp_end)}` : 'to do'
+      return `${d.text ?? ''} · ${status}`
+    }
     case 'question_for_pediatrician':
       return time
     case 'note':

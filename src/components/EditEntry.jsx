@@ -135,6 +135,9 @@ function TypeFields({ type, data, setField }) {
     case 'milestone': return <div className="flex flex-wrap gap-3">
       {txt('label', 'Label', 'first smile')}
     </div>
+    case 'reminder': return <div className="flex flex-wrap gap-3">
+      {txt('text', 'Reminder', 'e.g. book vaccination')}
+    </div>
     default: return null
   }
 }

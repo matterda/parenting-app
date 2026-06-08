@@ -16,6 +16,7 @@ import FeedOverdueBanner from './components/FeedOverdueBanner'
 import OutstandingLogs from './components/OutstandingLogs'
 import QuickLog from './components/QuickLog'
 import WeighInCard from './components/WeighInCard'
+import Reminders from './components/Reminders'
 import { computeWeighEstimate } from './utils/weighFeed'
 import ReportView from './components/ReportView'
 
@@ -377,6 +378,7 @@ export default function App() {
               Or describe what happened in plain language. Tap the mic on your keyboard to dictate.
             </p>
             <LogInput key={prefilledText} defaultValue={prefilledText} onAdd={handleAdd} />
+            <Reminders events={events} onCreate={handleCreate} onEdit={handleEdit} onDelete={handleDelete} />
             <OutstandingLogs events={events} onEdit={handleEdit} />
           </section>
         )}
