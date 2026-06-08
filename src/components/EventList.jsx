@@ -100,14 +100,42 @@ export default function EventList({ events, onDelete, onEdit, onCreate, onRetryR
       {visible.length === 0 ? (
         <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-4">No entries of this type.</p>
       ) : (
-        <ul className="flex flex-col gap-3">
-          {visible.map(ev => (
-            <EventItem key={ev.id} ev={ev} onDelete={onDelete} onEdit={onEdit} onRetryRaw={onRetryRaw} />
+        <div className="flex flex-col gap-4">
+          {groupByDay(visible).map(g => (
+            <div key={g.key} className="flex gap-2">
+              <ul className="flex-1 flex flex-col gap-3 min-w-0">
+                {g.items.map(ev => (
+                  <EventItem key={ev.id} ev={ev} onDelete={onDelete} onEdit={onEdit} onRetryRaw={onRetryRaw} />
+                ))}
+              </ul>
+              {/* Day indicator: vertical bar + short date label */}
+              <div className="shrink-0 w-9 relative">
+                <div className="absolute top-6 bottom-0 left-1/2 -translate-x-1/2 w-px bg-violet-200 dark:bg-violet-800" />
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 rounded bg-violet-100 dark:bg-violet-900 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:text-violet-300 whitespace-nowrap">
+                  {g.label}
+                </span>
+              </div>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   )
+}
+
+// Group events into consecutive same-day buckets, newest day first, each day's
+// events newest-first. Returns [{ key, label: "6/6", items: [...] }].
+function groupByDay(events) {
+  const sorted = [...events].sort((a, b) => (a.timestamp_start < b.timestamp_start ? 1 : -1))
+  const groups = []
+  for (const ev of sorted) {
+    const d = new Date(ev.timestamp_start)
+    const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
+    const last = groups[groups.length - 1]
+    if (last && last.key === key) last.items.push(ev)
+    else groups.push({ key, label: `${d.getDate()}/${d.getMonth() + 1}`, items: [ev] })
+  }
+  return groups
 }
 
 function FilterChip({ label, active, onClick }) {

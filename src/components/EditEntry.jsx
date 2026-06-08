@@ -5,8 +5,8 @@ export default function EditEntry({ ev, onSave, onCancel }) {
   const [data, setData] = useState({ ...(ev.data ?? {}) })
   const [contextNote, setContextNote] = useState(ev.context_note ?? '')
   const [rawText, setRawText] = useState(ev.raw_text ?? '')
-  const [timeStart, setTimeStart] = useState(toTimeInput(ev.timestamp_start))
-  const [timeEnd, setTimeEnd] = useState(toTimeInput(ev.timestamp_end))
+  const [timeStart, setTimeStart] = useState(toDateTimeInput(ev.timestamp_start))
+  const [timeEnd, setTimeEnd] = useState(toDateTimeInput(ev.timestamp_end))
 
   function setField(key, val) {
     setData(prev => ({ ...prev, [key]: val }))
@@ -19,16 +19,9 @@ export default function EditEntry({ ev, onSave, onCancel }) {
     } else {
       patch.data = data
       patch.context_note = contextNote.trim() || null
-      const start = applyTimeInput(ev.timestamp_start, timeStart)
-      patch.timestamp_start = start
+      patch.timestamp_start = applyDateTimeInput(ev.timestamp_start, timeStart)
       if (ev.timestamp_end != null) {
-        let end = applyTimeInput(ev.timestamp_end, timeEnd)
-        // If the end lands before the start (e.g. a sleep crossing midnight),
-        // roll it forward a day so the duration stays positive.
-        if (new Date(end).getTime() < new Date(start).getTime()) {
-          end = toLocalISO(new Date(new Date(end).getTime() + 86_400_000))
-        }
-        patch.timestamp_end = end
+        patch.timestamp_end = applyDateTimeInput(ev.timestamp_end, timeEnd)
       }
     }
     onSave(patch)
@@ -47,13 +40,13 @@ export default function EditEntry({ ev, onSave, onCancel }) {
         </Field>
       ) : (
         <>
-          <div className="flex gap-3">
-            <Field label="Time">
-              <input type="time" className={inputCls} value={timeStart} onChange={e => setTimeStart(e.target.value)} />
+          <div className="flex flex-wrap gap-3">
+            <Field label="Date & time">
+              <input type="datetime-local" className={inputCls} value={timeStart} onChange={e => setTimeStart(e.target.value)} />
             </Field>
             {ev.timestamp_end != null && (
-              <Field label="End time">
-                <input type="time" className={inputCls} value={timeEnd} onChange={e => setTimeEnd(e.target.value)} />
+              <Field label="End date & time">
+                <input type="datetime-local" className={inputCls} value={timeEnd} onChange={e => setTimeEnd(e.target.value)} />
               </Field>
             )}
           </div>
@@ -153,18 +146,19 @@ function Field({ label, children }) {
 
 const inputCls = 'rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400'
 
-function toTimeInput(iso) {
+// Local-time value for <input type="datetime-local"> (YYYY-MM-DDTHH:MM).
+function toDateTimeInput(iso) {
   if (!iso) return ''
   const d = new Date(iso)
-  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+  const p = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
-function applyTimeInput(existingISO, timeStr) {
-  if (!timeStr) return existingISO
+function applyDateTimeInput(existingISO, val) {
+  if (!val) return existingISO
   try {
-    const d = new Date(existingISO)
-    const [h, m] = timeStr.split(':').map(Number)
-    d.setHours(h, m, 0, 0)
+    const d = new Date(val) // parsed as local time
+    if (isNaN(d.getTime())) return existingISO
     return toLocalISO(d)
   } catch { return existingISO }
 }
