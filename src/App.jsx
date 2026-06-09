@@ -28,7 +28,10 @@ function getActiveSleep(events) {
 }
 
 export default function App() {
-  const [tab, setTab] = useState('Log')
+  const [tab, setTab] = useState(() => {
+    const saved = localStorage.getItem('active_tab')
+    return TABS.includes(saved) ? saved : 'Log'
+  })
   const [events, setEvents] = useState([])
 
   // Extraction state
@@ -72,6 +75,9 @@ export default function App() {
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [events])
+
+  // Remember the current tab across refreshes / app restarts.
+  useEffect(() => { localStorage.setItem('active_tab', tab) }, [tab])
 
   const activeSleep = getActiveSleep(events)
 
