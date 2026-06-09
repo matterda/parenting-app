@@ -356,28 +356,28 @@ export default function App() {
         )}
 
         {phase === 'idle' && tab === 'Log' && (
-          <section className="flex flex-col gap-4">
-            {activeSleep && (
-              <ActiveSleepBanner
-                since={activeSleep.timestamp_start}
-                onMarkAwake={handleMarkAwake}
-              />
-            )}
-            {!activeSleep && (() => {
-              const lastSleep = lastOfType(events, 'sleep')
-              return (
-                <LastSleepBanner
-                  lastSleep={lastSleep?.timestamp_end ? lastSleep : null}
-                  onStartSleep={handleStartSleep}
+          <section className="flex flex-col gap-3">
+            <div className="flex items-stretch gap-2">
+              {activeSleep ? (
+                <ActiveSleepBanner
+                  className="flex-1 min-w-0"
+                  since={activeSleep.timestamp_start}
+                  onMarkAwake={handleMarkAwake}
                 />
-              )
-            })()}
-            <FeedOverdueBanner events={events} />
+              ) : (() => {
+                const lastSleep = lastOfType(events, 'sleep')
+                return (
+                  <LastSleepBanner
+                    className="flex-1 min-w-0"
+                    lastSleep={lastSleep?.timestamp_end ? lastSleep : null}
+                    onStartSleep={handleStartSleep}
+                  />
+                )
+              })()}
+              <FeedOverdueBanner className="flex-1 min-w-0" events={events} />
+            </div>
             <QuickLog onCreate={handleCreate} />
             <WeighInCard events={events} onWeighIn={handleWeighIn} />
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Or describe what happened in plain language. Tap the mic on your keyboard to dictate.
-            </p>
             <LogInput key={prefilledText} defaultValue={prefilledText} onAdd={handleAdd} />
             <Reminders events={events} onCreate={handleCreate} onEdit={handleEdit} onDelete={handleDelete} />
             <OutstandingLogs events={events} onEdit={handleEdit} />

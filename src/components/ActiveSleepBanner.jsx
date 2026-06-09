@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-export default function ActiveSleepBanner({ since, onMarkAwake }) {
+export default function ActiveSleepBanner({ since, onMarkAwake, className = '' }) {
   const [elapsed, setElapsed] = useState(getElapsed(since))
 
   // Update elapsed every minute
@@ -10,7 +10,7 @@ export default function ActiveSleepBanner({ since, onMarkAwake }) {
   }, [since])
 
   return (
-    <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950 p-4 flex items-center justify-between gap-3">
+    <div className={`rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950 px-4 py-3 flex items-center justify-between gap-2 ${className}`}>
       <div>
         <div className="flex items-center gap-2">
           <span className="inline-block h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
@@ -24,7 +24,7 @@ export default function ActiveSleepBanner({ since, onMarkAwake }) {
       </div>
       <button
         onClick={onMarkAwake}
-        className="shrink-0 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition"
+        className="shrink-0 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition"
       >
         Awake ☀
       </button>
@@ -34,7 +34,7 @@ export default function ActiveSleepBanner({ since, onMarkAwake }) {
 
 // Shown in Log tab when baby is awake — time since last sleep ended, plus a
 // button to start a new sleep (mirrors the "Awake" button while sleeping).
-export function LastSleepBanner({ lastSleep, onStartSleep }) {
+export function LastSleepBanner({ lastSleep, onStartSleep, className = '' }) {
   const end = lastSleep?.timestamp_end ?? null
   const [since, setSince] = useState(() => (end ? getElapsed(end) : null))
 
@@ -46,23 +46,23 @@ export function LastSleepBanner({ lastSleep, onStartSleep }) {
   }, [end])
 
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 flex items-center justify-between gap-3 shadow-sm">
-      <div className="flex items-center gap-3 min-w-0">
+    <div className={`rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 flex items-center justify-between gap-2 shadow-sm ${className}`}>
+      <div className="flex items-center gap-2 min-w-0">
         <span className="text-lg">😴</span>
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
             {end ? `Awake for ${since}` : 'Baby awake'}
           </p>
           {end && (
-            <p className="text-xs text-gray-400 dark:text-gray-500">
-              Last sleep ended at {formatTime(end)}
+            <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+              Last sleep ended {formatTime(end)}
             </p>
           )}
         </div>
       </div>
       <button
         onClick={onStartSleep}
-        className="shrink-0 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition"
+        className="shrink-0 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition"
       >
         Sleep 🌙
       </button>
