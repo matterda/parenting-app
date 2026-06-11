@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { lastOfType, todayCounts, dailySeries, relativeTime, weightSeries } from '../utils/aggregate'
+import { lastOfType, todayCounts, dailySeries, relativeTime, weightSeries, pumpingScatter } from '../utils/aggregate'
 import { eventToText } from '../utils/eventToText'
 import TimelineView from './TimelineView'
 
@@ -20,6 +20,7 @@ export default function TrendView({ events }) {
   const lastPumping = lastOfType(events, 'pumping')
   const series = dailySeries(events, 7)
   const weights = weightSeries(events)
+  const pumps = pumpingScatter(events)
 
   return (
     <div className="flex flex-col gap-6">
@@ -54,6 +55,14 @@ export default function TrendView({ events }) {
         <BarRow title="Total sleep (hrs)" series={series} field="sleepHours" color="bg-indigo-400" unit="h" />
         <StackedBarRow title="Diapers / day" series={series} />
       </section>
+
+      {/* Pumping: volume vs duration */}
+      {pumps.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Pumping: yield vs duration</h2>
+          <PumpScatter points={pumps} />
+        </section>
+      )}
 
       {/* Weight over time */}
       {weights.length > 0 && (
@@ -445,6 +454,71 @@ function WeightPlot({ weights }) {
               {t.label}
             </span>
           ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── PumpScatter ──────────────────────────────────────────────────────────────
+// Scatter of pumping sessions: x = duration (min), y = volume (ml), dot color =
+// time of day. Reveals yield efficiency and whether it varies morning vs night.
+function hourColor(h) {
+  return `hsl(${(h / 24) * 300}, 70%, 50%)`
+}
+
+function PumpScatter({ points }) {
+  const [tip, setTip] = useState(null)
+  const H = 160
+  const PAD = 8
+  const xMax = Math.max(...points.map(p => p.durationMin), 1)
+  const yMax = Math.max(...points.map(p => p.volumeMl), 1)
+  const xPct = d => Math.min(100, (d / xMax) * 100)
+  const yPx = v => (v / yMax) * (H - PAD * 2) + PAD
+
+  const yTicks = [yMax, yMax / 2, 0].map(v => Math.round(v))
+  const xTicks = [0, xMax / 2, xMax].map(v => Math.round(v))
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-start gap-1">
+        <div className="relative pr-1 shrink-0" style={{ height: H, width: 34 }}>
+          {yTicks.map((v, i) => (
+            <span key={i} className="absolute right-1 text-[9px] text-gray-500 dark:text-gray-400 -translate-y-1/2" style={{ top: `${TICK_PCTS[i]}%` }}>{v}ml</span>
+          ))}
+        </div>
+        <div className="flex-1">
+          <div className="relative w-full rounded-lg border border-gray-100 dark:border-gray-800" style={{ height: H }}>
+            {TICK_PCTS.map(p => (
+              <div key={p} className="absolute left-0 right-0 border-t border-gray-50 dark:border-gray-800/60" style={{ top: `${p}%` }} />
+            ))}
+            {points.map(p => (
+              <button
+                key={p.key}
+                onClick={() => setTip(tip === p.key ? null : p.key)}
+                className="absolute h-2.5 w-2.5 -translate-x-1/2 translate-y-1/2 rounded-full ring-1 ring-white/70 dark:ring-black/40 hover:scale-125 transition-transform"
+                style={{ left: `${xPct(p.durationMin)}%`, bottom: `${yPx(p.volumeMl)}px`, backgroundColor: hourColor(p.hour) }}
+              >
+                {tip === p.key && (
+                  <span className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-1.5 py-0.5 whitespace-nowrap z-10 shadow">
+                    {p.volumeMl}ml · {p.durationMin}min · {p.time} {p.date}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          <div className="relative mt-1 h-3">
+            {xTicks.map((v, i) => (
+              <span key={i} className={`absolute text-[9px] text-gray-500 dark:text-gray-400 leading-none ${i === 0 ? '' : i === 2 ? '-translate-x-full' : '-translate-x-1/2'}`} style={{ left: `${[0, 50, 100][i]}%` }}>{v}min</span>
+            ))}
+          </div>
+        </div>
+      </div>
+      {/* Color legend: time of day */}
+      <div className="pl-9">
+        <div className="h-2 rounded-full" style={{ background: `linear-gradient(to right, ${hourColor(0)}, ${hourColor(6)}, ${hourColor(12)}, ${hourColor(18)}, ${hourColor(24)})` }} />
+        <div className="flex justify-between text-[9px] text-gray-400 dark:text-gray-500 mt-0.5">
+          <span>00h</span><span>06h</span><span>12h</span><span>18h</span><span>24h</span>
         </div>
       </div>
     </div>

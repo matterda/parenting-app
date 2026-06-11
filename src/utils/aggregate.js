@@ -171,6 +171,25 @@ export function incompleteEvents(events, withinHours = 24) {
   return out
 }
 
+// Pumping sessions that have BOTH a duration and a volume, for the
+// volume-vs-duration scatter. hour is the local time-of-day (0–24, fractional).
+export function pumpingScatter(events) {
+  return events
+    .filter(e => e.extracted && e.type === 'pumping' && e.data?.volume_ml != null && e.data?.duration_min != null)
+    .map(e => {
+      const d = new Date(e.timestamp_start)
+      return {
+        key: e.id,
+        ts: d.getTime(),
+        hour: d.getHours() + d.getMinutes() / 60,
+        durationMin: Number(e.data.duration_min),
+        volumeMl: Number(e.data.volume_ml),
+        date: d.toLocaleDateString([], { month: 'short', day: 'numeric' }),
+        time: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }
+    })
+}
+
 export function relativeTime(iso) {
   if (!iso) return '—'
   const diff = Date.now() - new Date(iso).getTime()
