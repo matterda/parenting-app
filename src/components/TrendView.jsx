@@ -461,14 +461,16 @@ function WeightPlot({ weights }) {
 }
 
 // ─── PumpScatter ──────────────────────────────────────────────────────────────
-// Scatter of pumping sessions: x = duration (min), y = volume (ml), dot color =
-// time of day. Reveals yield efficiency and whether it varies morning vs night.
-function hourColor(h) {
-  return `hsl(${(h / 24) * 300}, 70%, 50%)`
+// Scatter of pumping sessions: x = duration (min), y = volume (ml). Dot color
+// switches between time of day (morning vs night) and absolute time (recency,
+// to see supply trend over the logged period).
+function fracColor(f) {
+  return `hsl(${f * 300}, 70%, 50%)`
 }
 
 function PumpScatter({ points }) {
   const [tip, setTip] = useState(null)
+  const [mode, setMode] = useState('tod') // 'tod' = time of day | 'date' = absolute time
   const H = 160
   const PAD = 8
   const xMax = Math.max(...points.map(p => p.durationMin), 1)
@@ -479,8 +481,28 @@ function PumpScatter({ points }) {
   const yTicks = [yMax, yMax / 2, 0].map(v => Math.round(v))
   const xTicks = [0, xMax / 2, xMax].map(v => Math.round(v))
 
+  const tsMin = Math.min(...points.map(p => p.ts))
+  const tsMax = Math.max(...points.map(p => p.ts))
+  const tsRange = tsMax - tsMin || 1
+  const colorFrac = p => (mode === 'tod' ? p.hour / 24 : (p.ts - tsMin) / tsRange)
+  const fmtDate = ms => new Date(ms).toLocaleDateString([], { month: 'short', day: 'numeric' })
+
   return (
     <div className="flex flex-col gap-2">
+      {/* Color mode switch */}
+      <div className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5 self-end">
+        {[['tod', 'Time of day'], ['date', 'Absolute time']].map(([m, label]) => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+              mode === m ? 'bg-white dark:bg-gray-900 text-violet-600 dark:text-violet-400 shadow-sm' : 'text-gray-500 dark:text-gray-400'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <div className="flex items-start gap-1">
         <div className="relative pr-1 shrink-0" style={{ height: H, width: 34 }}>
           {yTicks.map((v, i) => (
@@ -497,7 +519,7 @@ function PumpScatter({ points }) {
                 key={p.key}
                 onClick={() => setTip(tip === p.key ? null : p.key)}
                 className="absolute h-2.5 w-2.5 -translate-x-1/2 translate-y-1/2 rounded-full ring-1 ring-white/70 dark:ring-black/40 hover:scale-125 transition-transform"
-                style={{ left: `${xPct(p.durationMin)}%`, bottom: `${yPx(p.volumeMl)}px`, backgroundColor: hourColor(p.hour) }}
+                style={{ left: `${xPct(p.durationMin)}%`, bottom: `${yPx(p.volumeMl)}px`, backgroundColor: fracColor(colorFrac(p)) }}
               >
                 {tip === p.key && (
                   <span className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-1.5 py-0.5 whitespace-nowrap z-10 shadow">
@@ -514,11 +536,13 @@ function PumpScatter({ points }) {
           </div>
         </div>
       </div>
-      {/* Color legend: time of day */}
+      {/* Color legend */}
       <div className="pl-9">
-        <div className="h-2 rounded-full" style={{ background: `linear-gradient(to right, ${hourColor(0)}, ${hourColor(6)}, ${hourColor(12)}, ${hourColor(18)}, ${hourColor(24)})` }} />
+        <div className="h-2 rounded-full" style={{ background: `linear-gradient(to right, ${fracColor(0)}, ${fracColor(0.25)}, ${fracColor(0.5)}, ${fracColor(0.75)}, ${fracColor(1)})` }} />
         <div className="flex justify-between text-[9px] text-gray-400 dark:text-gray-500 mt-0.5">
-          <span>00h</span><span>06h</span><span>12h</span><span>18h</span><span>24h</span>
+          {mode === 'tod'
+            ? <><span>00h</span><span>06h</span><span>12h</span><span>18h</span><span>24h</span></>
+            : <><span>{fmtDate(tsMin)}</span><span>{fmtDate(tsMin + tsRange / 2)}</span><span>{fmtDate(tsMax)}</span></>}
         </div>
       </div>
     </div>
