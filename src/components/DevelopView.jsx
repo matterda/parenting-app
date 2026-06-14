@@ -1,5 +1,12 @@
 import { useState } from 'react'
 import { EXPERIMENTS, DOMAINS } from '../devCatalog'
+import { toLocalISO } from '../utils/time'
+
+function toDateInput(ms) {
+  const d = new Date(ms)
+  const p = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
 
 const RESULTS = [
   { key: 'observed', label: 'Observed', cls: 'bg-green-600 text-white', dim: 'text-green-600 dark:text-green-400' },
@@ -22,6 +29,7 @@ function weeksLabel(start, end) {
 
 export default function DevelopView({ events, onLog }) {
   const weeks = ageWeeks()
+  const dobMs = new Date(localStorage.getItem('baby_dob') ?? 0).getTime()
 
   if (weeks == null) {
     return (
@@ -36,10 +44,13 @@ export default function DevelopView({ events, onLog }) {
   for (const e of events) {
     if (!e.extracted || e.type !== 'devcheck' || !e.data?.experiment_id) continue
     const id = e.data.experiment_id
-    const slot = byExp[id] ?? (byExp[id] = { latest: null, latestTs: 0, observedTs: null })
+    const slot = byExp[id] ?? (byExp[id] = { latest: null, latestTs: 0, observedTs: null, observedApprox: false })
     const t = new Date(e.timestamp_start).getTime()
     if (t >= slot.latestTs) { slot.latestTs = t; slot.latest = e.data.result }
-    if (e.data.result === 'observed' && (slot.observedTs == null || t < slot.observedTs)) slot.observedTs = t
+    if (e.data.result === 'observed' && (slot.observedTs == null || t < slot.observedTs)) {
+      slot.observedTs = t
+      slot.observedApprox = !!e.data.approx
+    }
   }
 
   const logged = [], tryNow = [], soon = []
@@ -64,14 +75,14 @@ export default function DevelopView({ events, onLog }) {
         </p>
       </div>
 
-      <Section title="Try now" subtitle="Windows open at this age" experiments={tryNow} byExp={byExp} onLog={onLog} emptyText="Nothing active right now — check Coming soon." />
-      <Section title="Logged" subtitle="What you've tried" experiments={logged} byExp={byExp} onLog={onLog} emptyText="Nothing logged yet — try one above." />
-      <Section title="Coming soon" subtitle="Windows opening later" experiments={soon} byExp={byExp} onLog={onLog} upcoming weeks={weeks} emptyText={null} />
+      <Section title="Try now" subtitle="Windows open at this age" experiments={tryNow} byExp={byExp} onLog={onLog} dobMs={dobMs} emptyText="Nothing active right now — check Coming soon." />
+      <Section title="Logged" subtitle="What you've tried" experiments={logged} byExp={byExp} onLog={onLog} dobMs={dobMs} emptyText="Nothing logged yet — try one above." />
+      <Section title="Coming soon" subtitle="Windows opening later" experiments={soon} byExp={byExp} onLog={onLog} dobMs={dobMs} upcoming weeks={weeks} emptyText={null} />
     </div>
   )
 }
 
-function Section({ title, subtitle, experiments, byExp, onLog, emptyText, upcoming, weeks }) {
+function Section({ title, subtitle, experiments, byExp, onLog, dobMs, emptyText, upcoming, weeks }) {
   if (experiments.length === 0 && emptyText == null) return null
   return (
     <section className="flex flex-col gap-2">
@@ -84,7 +95,7 @@ function Section({ title, subtitle, experiments, byExp, onLog, emptyText, upcomi
       ) : (
         <div className="flex flex-col gap-2">
           {experiments.map(exp => (
-            <ExperimentCard key={exp.id} exp={exp} state={byExp[exp.id]} onLog={onLog} upcoming={upcoming} weeks={weeks} />
+            <ExperimentCard key={exp.id} exp={exp} state={byExp[exp.id]} onLog={onLog} dobMs={dobMs} upcoming={upcoming} weeks={weeks} />
           ))}
         </div>
       )}
@@ -92,11 +103,25 @@ function Section({ title, subtitle, experiments, byExp, onLog, emptyText, upcomi
   )
 }
 
-function ExperimentCard({ exp, state, onLog, upcoming, weeks }) {
+function ExperimentCard({ exp, state, onLog, dobMs, upcoming, weeks }) {
   const [open, setOpen] = useState(false)
+  const [dateOpen, setDateOpen] = useState(false)
+  const todayStr = toDateInput(Date.now())
+  const suggestStr = toDateInput(Math.min(Date.now(), dobMs + exp.start * 7 * 86_400_000))
+  const [date, setDate] = useState(suggestStr)
   const dom = DOMAINS[exp.domain]
   const latest = state?.latest
   const latestR = latest ? RESULT_BY_KEY[latest] : null
+
+  function log(result) {
+    // If a date is open, treat it as an approximate/backfilled observation;
+    // otherwise log live at "now".
+    if (dateOpen && date) {
+      onLog(exp, result, toLocalISO(new Date(date + 'T12:00')))
+    } else {
+      onLog(exp, result, null)
+    }
+  }
 
   return (
     <div className={`rounded-xl border p-3 shadow-sm ${
@@ -112,7 +137,7 @@ function ExperimentCard({ exp, state, onLog, upcoming, weeks }) {
         </div>
         <div className="mt-0.5 flex items-center gap-2">
           <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500">{dom.label}</span>
-          {latestR && <span className={`text-[10px] font-semibold ${latestR.dim}`}>· {latestR.label}{state.observedTs ? ` ${new Date(state.observedTs).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : ''}</span>}
+          {latestR && <span className={`text-[10px] font-semibold ${latestR.dim}`}>· {latestR.label}{state.observedTs ? ` ${state.observedApprox ? '~' : ''}${new Date(state.observedTs).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : ''}</span>}
           {upcoming && <span className="text-[10px] text-gray-400 dark:text-gray-500">· opens in {Math.max(1, Math.ceil(exp.start - weeks))} wk</span>}
         </div>
       </button>
@@ -121,11 +146,11 @@ function ExperimentCard({ exp, state, onLog, upcoming, weeks }) {
         <div className="mt-2 flex flex-col gap-1.5">
           <p className="text-xs text-gray-600 dark:text-gray-300"><span className="font-medium">Try:</span> {exp.how}</p>
           <p className="text-xs text-gray-500 dark:text-gray-400"><span className="font-medium">Look for:</span> {exp.look_for}</p>
-          <div className="mt-1 flex gap-1.5">
+          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
             {RESULTS.map(r => (
               <button
                 key={r.key}
-                onClick={() => onLog(exp, r.key)}
+                onClick={() => log(r.key)}
                 className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
                   latest === r.key ? r.cls : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                 }`}
@@ -133,7 +158,34 @@ function ExperimentCard({ exp, state, onLog, upcoming, weeks }) {
                 {r.label}
               </button>
             ))}
+            <button
+              onClick={() => setDateOpen(o => !o)}
+              className={`ml-auto rounded-lg px-2 py-1 text-xs font-medium transition ${
+                dateOpen ? 'bg-violet-100 dark:bg-violet-900 text-violet-700 dark:text-violet-300' : 'text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+            >
+              📅 {dateOpen ? 'now' : 'backfill'}
+            </button>
           </div>
+          {dateOpen && (
+            <div className="mt-1 flex flex-col gap-1 rounded-lg bg-violet-50 dark:bg-violet-950 p-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  max={todayStr}
+                  value={date}
+                  onChange={e => setDate(e.target.value)}
+                  className="rounded-md border border-violet-200 dark:border-violet-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-violet-400"
+                />
+                <button onClick={() => setDate(suggestStr)} className="rounded-md px-2 py-1 text-[11px] font-medium bg-violet-100 dark:bg-violet-900 text-violet-700 dark:text-violet-300">
+                  ≈ window start
+                </button>
+              </div>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                Don't know exactly? An estimate is fine — it's saved as approximate (~). Pick a result above to log it on this date.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
