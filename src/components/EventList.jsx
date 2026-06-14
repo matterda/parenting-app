@@ -85,18 +85,31 @@ export default function EventList({ events, onDelete, onEdit, onCreate, onRetryR
   return (
     <div className="flex flex-col gap-3">
       {viewToggle}
-      {/* Filter chips — multi-select; "All" clears the selection */}
-      <div className="flex flex-wrap gap-1.5">
+      {/* Filter chips — multi-select (additive); "All"/"Clear" resets */}
+      <div className="flex flex-wrap items-center gap-1.5">
         <FilterChip label="All" active={selected.size === 0} onClick={() => setSelected(new Set())} />
         {presentTypes.map(t => (
           <FilterChip
             key={t}
-            label={TYPE_LABELS[t] ?? t}
+            label={`${selected.has(t) ? '✓ ' : ''}${TYPE_LABELS[t] ?? t}`}
             active={selected.has(t)}
             onClick={() => toggle(t)}
           />
         ))}
+        {selected.size > 0 && (
+          <button
+            onClick={() => setSelected(new Set())}
+            className="rounded-full px-3 py-1 text-xs font-medium bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 transition"
+          >
+            Clear ({selected.size}) ✕
+          </button>
+        )}
       </div>
+      {selected.size > 0 && (
+        <p className="-mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+          Filtering {selected.size} type{selected.size > 1 ? 's' : ''} — tap more to combine, Clear to reset.
+        </p>
+      )}
 
       {visible.length === 0 ? (
         <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-4">No entries of this type.</p>
@@ -148,7 +161,7 @@ function FilterChip({ label, active, onClick }) {
       onClick={onClick}
       className={`rounded-full px-3 py-1 text-xs font-medium transition ${
         active
-          ? 'bg-violet-600 text-white'
+          ? 'bg-violet-600 text-white ring-2 ring-violet-300 dark:ring-violet-700'
           : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
       }`}
     >
