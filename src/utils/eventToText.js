@@ -1,5 +1,6 @@
 // eventToText: returns the descriptive part only — the type badge in the UI already
 // shows the event type, so we don't repeat it here.
+import { EXPERIMENTS_BY_ID } from '../devCatalog'
 
 export function eventToText(event) {
   const time = formatTime(event.timestamp_start)
@@ -48,6 +49,10 @@ export function eventToText(event) {
       return `${d.name}${d.dose ? ` ${d.dose}` : ''} · ${time}`
     case 'milestone':
       return `${d.label} · ${time}`
+    case 'devcheck': {
+      const name = EXPERIMENTS_BY_ID[d.experiment_id]?.title ?? d.experiment_id
+      return `${name} — ${(d.result ?? '').replace('_', ' ')} · ${time}`
+    }
     case 'reminder': {
       const status = event.timestamp_end ? `done ${formatTime(event.timestamp_end)}` : 'to do'
       return `${d.text ?? ''} · ${status}`

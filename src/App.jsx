@@ -20,8 +20,9 @@ import Reminders from './components/Reminders'
 import { computeWeighEstimate } from './utils/weighFeed'
 import ReportView from './components/ReportView'
 import AskView from './components/AskView'
+import DevelopView from './components/DevelopView'
 
-const TABS = ['Log', 'History', 'Trends', 'Report', 'Ask', 'Settings']
+const TABS = ['Log', 'History', 'Trends', 'Develop', 'Report', 'Ask', 'Settings']
 
 function getActiveSleep(events) {
   return events.find(e => e.extracted && e.type === 'sleep' && !e.timestamp_end) ?? null
@@ -231,6 +232,20 @@ export default function App() {
     await refreshEvents()
   }
 
+  // Log a developmental experiment result. On the first "observed" for an
+  // experiment, also mint a milestone so it shows in History and the Report.
+  async function handleDevCheck(experiment, result) {
+    const now = toLocalISO(new Date())
+    const base = { timestamp_end: null, context_note: null, raw_text: null, confidence: 'high', needs_confirmation: [] }
+    const toAdd = [{ type: 'devcheck', timestamp_start: now, data: { experiment_id: experiment.id, result }, ...base }]
+    const hasMilestone = events.some(e => e.extracted && e.type === 'milestone' && e.data?.experiment_id === experiment.id)
+    if (result === 'observed' && !hasMilestone) {
+      toAdd.push({ type: 'milestone', timestamp_start: now, data: { label: experiment.title, experiment_id: experiment.id }, ...base })
+    }
+    await addImportedEvents(toAdd)
+    await refreshEvents()
+  }
+
   // Non-LLM create path used by the day-timeline editor: insert one structured
   // event at a chosen time, then return it so the timeline can open its editor.
   async function handleCreate(ev) {
@@ -400,6 +415,10 @@ export default function App() {
 
         {phase === 'idle' && tab === 'Report' && (
           <ReportView events={events} />
+        )}
+
+        {phase === 'idle' && tab === 'Develop' && (
+          <DevelopView events={events} onLog={handleDevCheck} />
         )}
 
         {phase === 'idle' && tab === 'Ask' && (
