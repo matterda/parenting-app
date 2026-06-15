@@ -140,13 +140,15 @@ export default function EventList({ events, onDelete, onEdit, onCreate, onRetryR
 // Group events into consecutive same-day buckets, newest day first, each day's
 // events newest-first. Returns [{ key, label: "6/6", items: [...] }].
 function groupByDay(events) {
-  // Sort by actual time (epoch), not string — timestamps mix offset formats
-  // (raw entries use UTC "Z", others a local offset), so string comparison
-  // misorders them and can split a day into separate groups.
-  const sorted = [...events].sort((a, b) => new Date(b.timestamp_start) - new Date(a.timestamp_start))
+  // Order/group by an event's "effective" time: its end if it has one, else its
+  // start. This keeps an overnight sleep (e.g. 23:46 → 04:23) on the day you
+  // woke rather than filing it under the previous day by its start time. Using
+  // epoch (not string) is also robust to mixed offset formats (UTC "Z" vs local).
+  const eff = e => new Date(e.timestamp_end || e.timestamp_start).getTime()
+  const sorted = [...events].sort((a, b) => eff(b) - eff(a))
   const groups = []
   for (const ev of sorted) {
-    const d = new Date(ev.timestamp_start)
+    const d = new Date(ev.timestamp_end || ev.timestamp_start)
     const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
     const last = groups[groups.length - 1]
     if (last && last.key === key) last.items.push(ev)
