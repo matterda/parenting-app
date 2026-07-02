@@ -21,8 +21,13 @@ import { computeWeighEstimate } from './utils/weighFeed'
 import ReportView from './components/ReportView'
 import AskView from './components/AskView'
 import DevelopView from './components/DevelopView'
+import BottomNav from './components/BottomNav'
+import NavDrawer from './components/NavDrawer'
+import { MenuIcon } from './components/icons'
 
-const TABS = ['Log', 'History', 'Trends', 'Develop', 'Report', 'Ask', 'Settings']
+const PRIMARY_TABS = ['Log', 'History', 'Trends']
+const MENU_TABS = ['Develop', 'Report', 'Ask', 'Settings']
+const TABS = [...PRIMARY_TABS, ...MENU_TABS]
 
 function getActiveSleep(events) {
   return events.find(e => e.extracted && e.type === 'sleep' && !e.timestamp_end) ?? null
@@ -33,6 +38,7 @@ export default function App() {
     const saved = localStorage.getItem('active_tab')
     return TABS.includes(saved) ? saved : 'Log'
   })
+  const [menuOpen, setMenuOpen] = useState(false)
   const [events, setEvents] = useState([])
 
   // Extraction state
@@ -101,9 +107,11 @@ export default function App() {
     if (Math.abs(dy) > Math.abs(dx)) return
     // Require at least 60px horizontal swipe
     if (Math.abs(dx) < 60) return
-    const idx = TABS.indexOf(tab)
-    if (dx < 0 && idx < TABS.length - 1) setTab(TABS[idx + 1])
-    if (dx > 0 && idx > 0)               setTab(TABS[idx - 1])
+    // Swipe only cycles the bottom-bar tabs — menu tabs are reached via the drawer.
+    const idx = PRIMARY_TABS.indexOf(tab)
+    if (idx === -1) return
+    if (dx < 0 && idx < PRIMARY_TABS.length - 1) setTab(PRIMARY_TABS[idx + 1])
+    if (dx > 0 && idx > 0)                        setTab(PRIMARY_TABS[idx - 1])
   }, [phase, tab])
 
   async function handleAdd(rawText) {
@@ -319,28 +327,26 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
-      <header className="bg-violet-600 dark:bg-violet-800 px-4 pt-safe pb-3 shadow-md">
+      <header className="flex items-center gap-3 bg-violet-600 dark:bg-violet-800 px-4 pt-safe pb-3 shadow-md">
+        <button
+          onClick={() => { if (phase === 'idle') setMenuOpen(true) }}
+          className={`text-white ${phase !== 'idle' ? 'opacity-40 cursor-default' : ''}`}
+          aria-label="Open menu"
+        >
+          <MenuIcon className="h-6 w-6" />
+        </button>
         <h1 className="text-lg font-bold text-white tracking-tight">Baby Log</h1>
       </header>
 
-      <nav className="flex border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-        {TABS.map(t => (
-          <button
-            key={t}
-            onClick={() => { if (phase === 'idle') setTab(t) }}
-            className={`flex-1 py-3 text-sm font-medium transition ${
-              tab === t
-                ? 'border-b-2 border-violet-600 text-violet-600 dark:text-violet-400'
-                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-            } ${phase !== 'idle' ? 'opacity-40 cursor-default' : ''}`}
-          >
-            {t}
-          </button>
-        ))}
-      </nav>
+      <NavDrawer
+        open={menuOpen}
+        tab={tab}
+        onSelect={t => { if (phase === 'idle') setTab(t) }}
+        onClose={() => setMenuOpen(false)}
+      />
 
       <main
-        className="flex-1 overflow-y-auto p-4 max-w-xl mx-auto w-full"
+        className="flex-1 overflow-y-auto p-4 pb-20 max-w-xl mx-auto w-full"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -434,6 +440,12 @@ export default function App() {
           />
         )}
       </main>
+
+      <BottomNav
+        tab={tab}
+        onSelect={t => { if (phase === 'idle') setTab(t) }}
+        disabled={phase !== 'idle'}
+      />
     </div>
   )
 }
