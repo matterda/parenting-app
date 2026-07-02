@@ -5,6 +5,7 @@ import TimelineView from './TimelineView'
 import { WHO_WEIGHT_FOR_AGE_KG, MS_PER_WHO_MONTH } from '../utils/whoWeightForAge'
 
 export default function TrendView({ events }) {
+  const [days, setDays] = useState(14)
   const hasData = events.some(e => e.extracted)
   if (!hasData) {
     return (
@@ -14,7 +15,6 @@ export default function TrendView({ events }) {
     )
   }
 
-  const [days, setDays] = useState(14)
   const counts = todayCounts(events)
   const lastFeed = lastOfType(events, 'feed')
   const lastSleep = lastOfType(events, 'sleep')
