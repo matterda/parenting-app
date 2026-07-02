@@ -1,7 +1,16 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { eventToText } from '../utils/eventToText'
 import EditEntry from './EditEntry'
 import DayTimeline from './DayTimeline'
+
+// How far back the list shows initially, and how much further each time you
+// scroll to the end — keeps the DOM small on long-running logs while still
+// letting you page back through full history.
+const WINDOW_DAYS_STEP = 30
+
+// An event's "effective" time: its end if it has one, else its start. Keeps
+// an overnight sleep grouped/ordered by the day it ended, not started.
+const effTime = e => new Date(e.timestamp_end || e.timestamp_start).getTime()
 
 const TYPE_COLORS = {
   feed: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
@@ -31,6 +40,26 @@ export default function EventList({ events, onDelete, onEdit, onCreate, onRetryR
   // matches the 'raw' filter.
   const [selected, setSelected] = useState(() => new Set())
   const [view, setView] = useState('list') // 'list' | 'timeline'
+
+  // Only render events from the last `windowDays` — grows as you scroll to
+  // the end, so a years-long log doesn't put every entry in the DOM at once.
+  const [windowDays, setWindowDays] = useState(WINDOW_DAYS_STEP)
+  const sentinelRef = useRef(null)
+  const cutoff = Date.now() - windowDays * 86_400_000
+  const windowed = events.filter(e => effTime(e) >= cutoff)
+  const hasMore = windowed.length < events.length
+
+  useEffect(() => {
+    if (!hasMore || view !== 'list') return
+    const el = sentinelRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setWindowDays(d => d + WINDOW_DAYS_STEP) },
+      { rootMargin: '600px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMore, view])
 
   const viewToggle = (
     <div className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5 self-end">
@@ -68,11 +97,11 @@ export default function EventList({ events, onDelete, onEdit, onCreate, onRetryR
     )
   }
 
-  // Derive the set of types that actually appear in the list
-  const presentTypes = [...new Set(events.map(e => e.type ?? 'raw').filter(Boolean))]
+  // Derive the set of types that appear within the currently loaded window
+  const presentTypes = [...new Set(windowed.map(e => e.type ?? 'raw').filter(Boolean))]
 
   const matches = e => selected.has(e.extracted ? e.type : 'raw')
-  const visible = selected.size === 0 ? events : events.filter(matches)
+  const visible = selected.size === 0 ? windowed : windowed.filter(matches)
 
   function toggle(t) {
     setSelected(prev => {
@@ -133,6 +162,11 @@ export default function EventList({ events, onDelete, onEdit, onCreate, onRetryR
           ))}
         </div>
       )}
+      {hasMore && (
+        <div ref={sentinelRef} className="py-2 text-center text-xs text-gray-300 dark:text-gray-600">
+          Loading more history…
+        </div>
+      )}
     </div>
   )
 }
@@ -140,12 +174,7 @@ export default function EventList({ events, onDelete, onEdit, onCreate, onRetryR
 // Group events into consecutive same-day buckets, newest day first, each day's
 // events newest-first. Returns [{ key, label: "6/6", items: [...] }].
 function groupByDay(events) {
-  // Order/group by an event's "effective" time: its end if it has one, else its
-  // start. This keeps an overnight sleep (e.g. 23:46 → 04:23) on the day you
-  // woke rather than filing it under the previous day by its start time. Using
-  // epoch (not string) is also robust to mixed offset formats (UTC "Z" vs local).
-  const eff = e => new Date(e.timestamp_end || e.timestamp_start).getTime()
-  const sorted = [...events].sort((a, b) => eff(b) - eff(a))
+  const sorted = [...events].sort((a, b) => effTime(b) - effTime(a))
   const groups = []
   for (const ev of sorted) {
     const d = new Date(ev.timestamp_end || ev.timestamp_start)
