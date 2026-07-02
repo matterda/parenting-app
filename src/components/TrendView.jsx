@@ -172,7 +172,7 @@ function BarRow({ title, series, field, color, unit }) {
             const px = val > 0 ? Math.max((val / max) * TRACK_PX, 4) : 0
             const showLabel = (series.length - 1 - i) % step === 0
             return (
-              <div key={d.key} className="flex-1 flex flex-col items-center gap-1">
+              <div key={d.key} className="flex-1 min-w-0 flex flex-col items-center gap-1">
                 <div className="relative w-full flex items-end justify-center" style={{ height: TRACK_PX }}>
                   <Gridlines />
                   <div
@@ -223,7 +223,7 @@ function StackedBarRow({ title, series }) {
             const pooPx = (d.diapersPoo / max) * TRACK_PX
             const showLabel = (series.length - 1 - i) % step === 0
             return (
-              <div key={d.key} className="flex-1 flex flex-col items-center gap-1">
+              <div key={d.key} className="flex-1 min-w-0 flex flex-col items-center gap-1">
                 <div
                   className="relative w-full flex flex-col justify-end cursor-pointer hover:opacity-75 transition-opacity"
                   style={{ height: TRACK_PX }}
@@ -293,7 +293,7 @@ function FeedMilkBarRow({ title, series }) {
             const tipPos = isFirst ? 'left-0' : isLast ? 'right-0' : 'left-1/2 -translate-x-1/2'
             const showLabel = (series.length - 1 - i) % step === 0
             return (
-              <div key={d.key} className="flex-1 flex flex-col items-center gap-1">
+              <div key={d.key} className="flex-1 min-w-0 flex flex-col items-center gap-1">
                 <div
                   className="relative w-full flex flex-col justify-end cursor-pointer hover:opacity-75 transition-opacity"
                   style={{ height: TRACK_PX }}
