@@ -141,9 +141,9 @@ function YAxis({ max, unit = '' }) {
   )
 }
 
-function Gridlines() {
+function Gridlines({ height = TRACK_PX }) {
   return (
-    <div className="absolute inset-x-0 top-0 pointer-events-none" style={{ height: TRACK_PX }}>
+    <div className="absolute inset-x-0 top-0 pointer-events-none" style={{ height }}>
       {TICK_PCTS.map(pct => (
         <div
           key={pct}
@@ -338,6 +338,9 @@ function FeedMilkBarRow({ title, series }) {
 const WHO_BAND_COLOR = '#22c55e'
 const WHO_BAND_OPACITY = 0.12
 const WHO_BANDS = [[0, 6], [1, 5], [2, 4]] // indices into WHO_PERCENTILES: [p3,p97] [p15,p85] [p25,p75]
+// Weight gets its own (taller) track height, independent of the bar charts'
+// shared TRACK_PX — makes it easier to see where each point sits in the WHO bands.
+const WEIGHT_TRACK_PX = 160
 
 function WeightPlot({ weights }) {
   const [tooltip, setTooltip] = useState(null)
@@ -375,11 +378,11 @@ function WeightPlot({ weights }) {
   const range = max - min || 1
 
   const xPct = ts => (single ? 50 : ((ts - tMin) / tRange) * 100)
-  const yPx  = kg => Math.max(((kg - min) / range) * (TRACK_PX - 16) + 8, 6)
+  const yPx  = kg => Math.max(((kg - min) / range) * (WEIGHT_TRACK_PX - 16) + 8, 6)
 
   const bandPolygon = (loIdx, hiIdx) => {
-    const top = framePoints.map((p, i) => `${xPct(p.ts)},${TRACK_PX - yPx(bandRows[i][hiIdx])}`)
-    const bottom = framePoints.map((p, i) => `${xPct(p.ts)},${TRACK_PX - yPx(bandRows[i][loIdx])}`).reverse()
+    const top = framePoints.map((p, i) => `${xPct(p.ts)},${WEIGHT_TRACK_PX - yPx(bandRows[i][hiIdx])}`)
+    const bottom = framePoints.map((p, i) => `${xPct(p.ts)},${WEIGHT_TRACK_PX - yPx(bandRows[i][loIdx])}`).reverse()
     return [...top, ...bottom].join(' ')
   }
 
@@ -395,7 +398,7 @@ function WeightPlot({ weights }) {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-start gap-1">
-        <div className="relative pr-1 shrink-0" style={{ height: TRACK_PX, width: Y_AXIS_W }}>
+        <div className="relative pr-1 shrink-0" style={{ height: WEIGHT_TRACK_PX, width: Y_AXIS_W }}>
           {[max, (max + min) / 2, min].map((v, i) => (
             <span
               key={i}
@@ -408,8 +411,8 @@ function WeightPlot({ weights }) {
         </div>
         <div className="flex-1">
           {/* Plot area */}
-          <div className="relative w-full" style={{ height: TRACK_PX }}>
-            <Gridlines />
+          <div className="relative w-full" style={{ height: WEIGHT_TRACK_PX }}>
+            <Gridlines height={WEIGHT_TRACK_PX} />
             {framePoints.length >= 2 && (
               <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 100 ${TRACK_PX}`} preserveAspectRatio="none">
                 {WHO_BANDS.map(([loIdx, hiIdx]) => (
