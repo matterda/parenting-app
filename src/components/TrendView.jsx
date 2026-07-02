@@ -127,14 +127,25 @@ function LastLine({ label, event }) {
 // ─── shared chart constants ───────────────────────────────────────────────────
 const TRACK_PX = 80
 const Y_TICKS = 3
+// One shared gutter width so every chart's plot area starts at the same x —
+// otherwise each chart's own widest tick label (e.g. weight's "4500g" vs
+// pumping's "80ml") pushes its bars/dots to a different offset.
+const Y_AXIS_W = 40
 
 // Tick positions as percentages from top: 0% = max, 50% = mid, 100% = 0
 const TICK_PCTS = [0, 50, 100]
 
+// Show at most ~6 x-axis labels regardless of how many days are plotted,
+// evenly spaced and anchored so the most recent (rightmost) day always has
+// one — avoids overlapping text once `days` grows past a week or two.
+function labelStep(len) {
+  return Math.max(1, Math.ceil(len / 6))
+}
+
 function YAxis({ max, unit = '' }) {
   const ticks = [max, max / 2, 0].map(v => Math.round(v * 10) / 10)
   return (
-    <div className="relative pr-1 shrink-0" style={{ height: TRACK_PX, width: 28 }}>
+    <div className="relative pr-1 shrink-0" style={{ height: TRACK_PX, width: Y_AXIS_W }}>
       {ticks.map((v, i) => (
         <span
           key={i}
@@ -169,6 +180,7 @@ function GroupedBarRow({ title, series, fieldA, labelA, colorA, fieldB, labelB, 
   const [tooltip, setTooltip] = useState(null)
   const maxA = Math.max(...series.map(d => d[fieldA]), 1)
   const maxB = Math.max(...series.map(d => d[fieldB]), 1)
+  const step = labelStep(series.length)
 
   return (
     <div>
@@ -186,12 +198,13 @@ function GroupedBarRow({ title, series, fieldA, labelA, colorA, fieldB, labelB, 
       <div className="flex items-start gap-1">
         <YAxis max={maxA} unit={unitA} />
         <div className="flex-1 flex items-start gap-2">
-          {series.map(d => {
+          {series.map((d, i) => {
             const valA = d[fieldA]
             const valB = d[fieldB]
             const pxA = valA > 0 ? Math.max((valA / maxA) * TRACK_PX, 4) : 0
             const pxB = valB > 0 ? Math.max((valB / maxB) * TRACK_PX, 4) : 0
             const key = d.key
+            const showLabel = (series.length - 1 - i) % step === 0
             return (
               <div key={key} className="flex-1 flex flex-col items-center gap-1">
                 <div className="relative w-full flex items-end gap-0.5" style={{ height: TRACK_PX }}>
@@ -221,7 +234,7 @@ function GroupedBarRow({ title, series, fieldA, labelA, colorA, fieldB, labelB, 
                     )}
                   </div>
                 </div>
-                <div className="text-[10px] text-gray-500 dark:text-gray-400">{d.label}</div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400 h-3.5">{showLabel ? d.label : ''}</div>
               </div>
             )
           })}
@@ -235,6 +248,7 @@ function GroupedBarRow({ title, series, fieldA, labelA, colorA, fieldB, labelB, 
 function BarRow({ title, series, field, color, unit }) {
   const [tooltip, setTooltip] = useState(null)
   const max = Math.max(...series.map(d => d[field]), 1)
+  const step = labelStep(series.length)
 
   return (
     <div>
@@ -242,9 +256,10 @@ function BarRow({ title, series, field, color, unit }) {
       <div className="flex items-start gap-1">
         <YAxis max={max} unit={unit} />
         <div className="flex-1 flex items-start gap-2">
-          {series.map(d => {
+          {series.map((d, i) => {
             const val = d[field]
             const px = val > 0 ? Math.max((val / max) * TRACK_PX, 4) : 0
+            const showLabel = (series.length - 1 - i) % step === 0
             return (
               <div key={d.key} className="flex-1 flex flex-col items-center gap-1">
                 <div className="relative w-full flex items-end justify-center" style={{ height: TRACK_PX }}>
@@ -261,8 +276,8 @@ function BarRow({ title, series, field, color, unit }) {
                     )}
                   </div>
                 </div>
-                <div className="text-[10px] text-gray-500 dark:text-gray-400">{val}{unit}</div>
-                <div className="text-[10px] text-gray-500 dark:text-gray-400">{d.label}</div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400 h-3.5">{showLabel ? `${val}${unit}` : ''}</div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400">{showLabel ? d.label : ''}</div>
               </div>
             )
           })}
@@ -276,6 +291,7 @@ function BarRow({ title, series, field, color, unit }) {
 function StackedBarRow({ title, series }) {
   const [tooltip, setTooltip] = useState(null)
   const max = Math.max(...series.map(d => d.diapersPee + d.diapersPoo), 1)
+  const step = labelStep(series.length)
 
   return (
     <div>
@@ -289,11 +305,12 @@ function StackedBarRow({ title, series }) {
       <div className="flex items-start gap-1">
         <YAxis max={max} />
         <div className="flex-1 flex items-start gap-2">
-          {series.map(d => {
+          {series.map((d, i) => {
             const total = d.diapersPee + d.diapersPoo
             // Strictly proportional so the stacked total matches the y-axis.
             const peePx = (d.diapersPee / max) * TRACK_PX
             const pooPx = (d.diapersPoo / max) * TRACK_PX
+            const showLabel = (series.length - 1 - i) % step === 0
             return (
               <div key={d.key} className="flex-1 flex flex-col items-center gap-1">
                 <div
@@ -310,8 +327,8 @@ function StackedBarRow({ title, series }) {
                     </div>
                   )}
                 </div>
-                <div className="text-[10px] text-gray-500 dark:text-gray-400">{total}</div>
-                <div className="text-[10px] text-gray-500 dark:text-gray-400">{d.label}</div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400 h-3.5">{showLabel ? total : ''}</div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400">{showLabel ? d.label : ''}</div>
               </div>
             )
           })}
@@ -329,6 +346,7 @@ function FeedMilkBarRow({ title, series }) {
   const [tooltip, setTooltip] = useState(null)
   const dayTotal = d => d.feedsBreastMl + d.feedsBottleBreastmilkMl + d.feedsBottleFormulaMl + d.feedsOtherMl
   const max = Math.max(...series.map(dayTotal), 1)
+  const step = labelStep(series.length)
 
   // Segments drawn top→bottom; first non-zero from the top gets the rounded cap.
   const SEGMENTS = [
@@ -362,6 +380,7 @@ function FeedMilkBarRow({ title, series }) {
             const isFirst = i === 0
             const isLast = i === series.length - 1
             const tipPos = isFirst ? 'left-0' : isLast ? 'right-0' : 'left-1/2 -translate-x-1/2'
+            const showLabel = (series.length - 1 - i) % step === 0
             return (
               <div key={d.key} className="flex-1 flex flex-col items-center gap-1">
                 <div
@@ -386,8 +405,8 @@ function FeedMilkBarRow({ title, series }) {
                     </div>
                   )}
                 </div>
-                <div className="text-[10px] text-gray-500 dark:text-gray-400">{totalMl}ml</div>
-                <div className="text-[10px] text-gray-500 dark:text-gray-400">{d.label}</div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400 h-3.5">{showLabel ? `${totalMl}ml` : ''}</div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400">{showLabel ? d.label : ''}</div>
               </div>
             )
           })}
@@ -428,7 +447,7 @@ function WeightPlot({ weights }) {
 
   return (
     <div className="flex items-start gap-1">
-      <div className="relative pr-1 shrink-0" style={{ height: TRACK_PX, width: 40 }}>
+      <div className="relative pr-1 shrink-0" style={{ height: TRACK_PX, width: Y_AXIS_W }}>
         {[max, (max + min) / 2, min].map((v, i) => (
           <span
             key={i}
@@ -521,7 +540,7 @@ function PumpScatter({ points }) {
         ))}
       </div>
       <div className="flex items-start gap-1">
-        <div className="relative pr-1 shrink-0" style={{ height: H, width: 34 }}>
+        <div className="relative pr-1 shrink-0" style={{ height: H, width: Y_AXIS_W }}>
           {yTicks.map((v, i) => (
             <span key={i} className="absolute right-1 text-[9px] text-gray-500 dark:text-gray-400 -translate-y-1/2" style={{ top: `${TICK_PCTS[i]}%` }}>{v}ml</span>
           ))}
@@ -554,7 +573,7 @@ function PumpScatter({ points }) {
         </div>
       </div>
       {/* Color legend */}
-      <div className="pl-9">
+      <div style={{ paddingLeft: Y_AXIS_W + 4 }}>
         <div className="h-2 rounded-full" style={{ background: `linear-gradient(to right, ${fracColor(0)}, ${fracColor(0.25)}, ${fracColor(0.5)}, ${fracColor(0.75)}, ${fracColor(1)})` }} />
         <div className="flex justify-between text-[9px] text-gray-400 dark:text-gray-500 mt-0.5">
           {mode === 'tod'
