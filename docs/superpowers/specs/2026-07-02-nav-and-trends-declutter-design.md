@@ -14,10 +14,10 @@ priority over the four used rarely (Develop, Report, Ask, Settings).
   (top-left) that opens the drawer described below.
 - **Bottom tab bar** (new, fixed to viewport bottom): Log, History, Trends —
   icon + label each. Replaces the current top tab row for these three.
-- **Left drawer** (new): hamburger tap slides a panel in from the left over
-  a dimming scrim, listing Settings, Ask, Report, Develop. Tapping an item
-  navigates and closes the drawer; tapping the scrim also closes it. No
-  animation library — CSS transform/transition on a fixed-position panel.
+- **Left drawer** (new): hamburger tap opens a panel from the left over
+  a dimming scrim, listing Develop, Report, Ask, Settings. Tapping an item
+  navigates and closes the drawer; tapping the scrim also closes it. Shows/hides
+  instantly via conditional render, no animation.
 - **State**: single `tab` state remains the source of truth, still persisted
   to `localStorage` under `active_tab`. Both the bottom bar and the drawer
   just call `setTab`.
@@ -25,7 +25,7 @@ priority over the four used rarely (Develop, Report, Ask, Settings).
   tabs (Log/History/Trends) — swiping should not land you in Settings by
   accident.
 - **Icons**: no icon library is installed. Hand-roll small inline SVGs
-  (pencil for Log, list for History, chart for Trends, hamburger, chevron)
+  (pencil for Log, list for History, chart for Trends, hamburger)
   rather than add a dependency for five icons.
 
 ## Section 2: Trends view declutter (`TrendView.jsx`)
