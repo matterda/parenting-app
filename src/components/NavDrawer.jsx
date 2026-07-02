@@ -1,4 +1,4 @@
-const ITEMS = ['Develop', 'Report', 'Ask', 'Settings']
+import { MENU_TABS } from '../App'
 
 export default function NavDrawer({ open, tab, onSelect, onClose }) {
   if (!open) return null
@@ -8,7 +8,7 @@ export default function NavDrawer({ open, tab, onSelect, onClose }) {
       <div className="absolute inset-y-0 left-0 w-64 max-w-[80%] bg-white dark:bg-gray-900 shadow-xl pt-safe flex flex-col">
         <div className="px-4 py-4 text-sm font-semibold text-gray-400 dark:text-gray-500">More</div>
         <nav className="flex flex-col">
-          {ITEMS.map(t => (
+          {MENU_TABS.map(t => (
             <button
               key={t}
               onClick={() => { onSelect(t); onClose() }}

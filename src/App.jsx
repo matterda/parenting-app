@@ -26,7 +26,7 @@ import NavDrawer from './components/NavDrawer'
 import { MenuIcon } from './components/icons'
 
 const PRIMARY_TABS = ['Log', 'History', 'Trends']
-const MENU_TABS = ['Develop', 'Report', 'Ask', 'Settings']
+export const MENU_TABS = ['Develop', 'Report', 'Ask', 'Settings']
 const TABS = [...PRIMARY_TABS, ...MENU_TABS]
 
 function getActiveSleep(events) {
