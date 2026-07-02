@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { lastOfType, todayCounts, dailySeries, relativeTime, weightSeries, pumpingScatter } from '../utils/aggregate'
 import { eventToText } from '../utils/eventToText'
 import TimelineView from './TimelineView'
+import { WHO_WEIGHT_FOR_AGE_KG, MS_PER_WHO_MONTH } from '../utils/whoWeightForAge'
 
 export default function TrendView({ events }) {
   const hasData = events.some(e => e.extracted)
@@ -419,13 +420,19 @@ function FeedMilkBarRow({ title, series }) {
 // ─── WeightPlot ───────────────────────────────────────────────────────────────
 // Scatter plot on a real time axis: dots sit at their actual measurement date,
 // so gaps between weigh-ins are visible (unlike evenly-spaced bars).
+//
+// WHO overlay: 3 nested translucent bands (3rd–97th, 15th–85th, 25th–75th
+// percentile) are drawn behind the dots, one WHO month per polygon vertex.
+// Same color/opacity for all three — where they overlap the alpha naturally
+// compounds into a darker-toward-median gradient, no gradient math needed.
+const WHO_BAND_COLOR = '#22c55e'
+const WHO_BAND_OPACITY = 0.12
+const WHO_BANDS = [[0, 6], [1, 5], [2, 4]] // indices into WHO_PERCENTILES: [p3,p97] [p15,p85] [p25,p75]
+
 function WeightPlot({ weights }) {
   const [tooltip, setTooltip] = useState(null)
   // Scale by kg-normalised values so 3000g and 3kg plot at the same height.
   const kgValues = weights.map(w => w.valueKg)
-  const min   = Math.min(...kgValues)
-  const max   = Math.max(...kgValues)
-  const range = max - min || 1
 
   const tValues = weights.map(w => w.ts)
   const tMin = Math.min(...tValues)
@@ -433,8 +440,38 @@ function WeightPlot({ weights }) {
   const tRange = tMax - tMin || 1
   const single = weights.length === 1
 
+  const babyDob = localStorage.getItem('baby_dob')
+  const babySex = localStorage.getItem('baby_sex')
+  const dobMs = babyDob ? new Date(babyDob).getTime() : null
+  const canOverlay = !single && dobMs && (babySex === 'boy' || babySex === 'girl')
+
+  // WHO monthly age points (0–24mo from DOB) padded one month past each edge
+  // of the visible time window, so band edges reach past the frame instead of
+  // stopping mid-chart. Points outside [0,100]% are clipped by the SVG itself.
+  let framePoints = []
+  if (canOverlay) {
+    const allMonths = Array.from({ length: 25 }, (_, m) => ({ month: m, ts: dobMs + m * MS_PER_WHO_MONTH }))
+    let lo = allMonths.findIndex(p => p.ts >= tMin)
+    lo = Math.max(0, (lo === -1 ? allMonths.length : lo) - 1)
+    let hi = allMonths.length - 1
+    while (hi > 0 && allMonths[hi].ts > tMax) hi--
+    hi = Math.min(allMonths.length - 1, hi + 1)
+    if (hi > lo) framePoints = allMonths.slice(lo, hi + 1)
+  }
+  const bandRows = framePoints.map(p => WHO_WEIGHT_FOR_AGE_KG[babySex][p.month])
+
+  const min = Math.min(...kgValues, ...bandRows.map(r => r[0]))
+  const max = Math.max(...kgValues, ...bandRows.map(r => r[r.length - 1]))
+  const range = max - min || 1
+
   const xPct = ts => (single ? 50 : ((ts - tMin) / tRange) * 100)
   const yPx  = kg => Math.max(((kg - min) / range) * (TRACK_PX - 16) + 8, 6)
+
+  const bandPolygon = (loIdx, hiIdx) => {
+    const top = framePoints.map((p, i) => `${xPct(p.ts)},${TRACK_PX - yPx(bandRows[i][hiIdx])}`)
+    const bottom = framePoints.map((p, i) => `${xPct(p.ts)},${TRACK_PX - yPx(bandRows[i][loIdx])}`).reverse()
+    return [...top, ...bottom].join(' ')
+  }
 
   const fmt = ms => new Date(ms).toLocaleDateString([], { month: 'short', day: 'numeric' })
   const xTicks = single
@@ -446,52 +483,66 @@ function WeightPlot({ weights }) {
       ]
 
   return (
-    <div className="flex items-start gap-1">
-      <div className="relative pr-1 shrink-0" style={{ height: TRACK_PX, width: Y_AXIS_W }}>
-        {[max, (max + min) / 2, min].map((v, i) => (
-          <span
-            key={i}
-            className="absolute right-1 text-[9px] text-gray-500 dark:text-gray-400 leading-none text-right -translate-y-1/2"
-            style={{ top: `${TICK_PCTS[i]}%` }}
-          >
-            {Math.round(v * 1000)}g
-          </span>
-        ))}
-      </div>
-      <div className="flex-1">
-        {/* Plot area */}
-        <div className="relative w-full" style={{ height: TRACK_PX }}>
-          <Gridlines />
-          {weights.map(w => (
-            <button
-              key={w.key}
-              onClick={() => setTooltip(tooltip === w.key ? null : w.key)}
-              className="absolute h-2.5 w-2.5 -translate-x-1/2 translate-y-1/2 rounded-full bg-green-500 ring-2 ring-white dark:ring-gray-900 cursor-pointer hover:scale-125 transition-transform"
-              style={{ left: `${xPct(w.ts)}%`, bottom: `${yPx(w.valueKg)}px` }}
-            >
-              {tooltip === w.key && (
-                <span className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-1.5 py-0.5 whitespace-nowrap z-10 shadow">
-                  {w.value}{w.unit} · {w.date}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-        {/* X axis (time) */}
-        <div className="relative mt-1 h-3">
-          {xTicks.map((t, i) => (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-start gap-1">
+        <div className="relative pr-1 shrink-0" style={{ height: TRACK_PX, width: Y_AXIS_W }}>
+          {[max, (max + min) / 2, min].map((v, i) => (
             <span
               key={i}
-              className={`absolute text-[9px] text-gray-500 dark:text-gray-400 leading-none ${
-                t.pct === 0 ? '' : t.pct === 100 ? '-translate-x-full' : '-translate-x-1/2'
-              }`}
-              style={{ left: `${t.pct}%` }}
+              className="absolute right-1 text-[9px] text-gray-500 dark:text-gray-400 leading-none text-right -translate-y-1/2"
+              style={{ top: `${TICK_PCTS[i]}%` }}
             >
-              {t.label}
+              {Math.round(v * 1000)}g
             </span>
           ))}
         </div>
+        <div className="flex-1">
+          {/* Plot area */}
+          <div className="relative w-full" style={{ height: TRACK_PX }}>
+            <Gridlines />
+            {framePoints.length >= 2 && (
+              <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 100 ${TRACK_PX}`} preserveAspectRatio="none">
+                {WHO_BANDS.map(([loIdx, hiIdx]) => (
+                  <polygon key={loIdx} points={bandPolygon(loIdx, hiIdx)} fill={WHO_BAND_COLOR} fillOpacity={WHO_BAND_OPACITY} />
+                ))}
+              </svg>
+            )}
+            {weights.map(w => (
+              <button
+                key={w.key}
+                onClick={() => setTooltip(tooltip === w.key ? null : w.key)}
+                className="absolute h-2.5 w-2.5 -translate-x-1/2 translate-y-1/2 rounded-full bg-green-500 ring-2 ring-white dark:ring-gray-900 cursor-pointer hover:scale-125 transition-transform"
+                style={{ left: `${xPct(w.ts)}%`, bottom: `${yPx(w.valueKg)}px` }}
+              >
+                {tooltip === w.key && (
+                  <span className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-1.5 py-0.5 whitespace-nowrap z-10 shadow">
+                    {w.value}{w.unit} · {w.date}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          {/* X axis (time) */}
+          <div className="relative mt-1 h-3">
+            {xTicks.map((t, i) => (
+              <span
+                key={i}
+                className={`absolute text-[9px] text-gray-500 dark:text-gray-400 leading-none ${
+                  t.pct === 0 ? '' : t.pct === 100 ? '-translate-x-full' : '-translate-x-1/2'
+                }`}
+                style={{ left: `${t.pct}%` }}
+              >
+                {t.label}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
+      {!canOverlay && !single && (
+        <p className="text-[11px] text-gray-400 dark:text-gray-500">
+          Set baby's date of birth and sex in Settings to overlay the WHO growth-chart reference range.
+        </p>
+      )}
     </div>
   )
 }

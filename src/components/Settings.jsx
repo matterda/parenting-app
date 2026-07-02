@@ -17,6 +17,7 @@ const SYNC_KEY = 'firebase_sync_url'
 const MODEL_KEY = 'anthropic_model'
 const BABY_NAME_KEY = 'baby_name'
 const BABY_DOB_KEY = 'baby_dob'
+const BABY_SEX_KEY = 'baby_sex'
 const THEMES = ['system', 'light', 'dark']
 const DELAY_OPTIONS = [1, 2, 3, 4]
 const FILTER_OPTIONS = [
@@ -33,6 +34,7 @@ const MODELS = [
 export default function Settings({ onNotifSettingsChanged, onRestore }) {
   const [babyName, setBabyName] = useState(() => localStorage.getItem(BABY_NAME_KEY) ?? '')
   const [babyDob, setBabyDob] = useState(() => localStorage.getItem(BABY_DOB_KEY) ?? '')
+  const [babySex, setBabySex] = useState(() => localStorage.getItem(BABY_SEX_KEY) ?? '')
   const [babySaved, setBabySaved] = useState(false)
   const [apiKey, setApiKey] = useState(() => localStorage.getItem(KEY) ?? '')
   const [saved, setSaved] = useState(false)
@@ -63,6 +65,7 @@ export default function Settings({ onNotifSettingsChanged, onRestore }) {
   function saveBaby() {
     localStorage.setItem(BABY_NAME_KEY, babyName.trim())
     localStorage.setItem(BABY_DOB_KEY, babyDob)
+    localStorage.setItem(BABY_SEX_KEY, babySex)
     setBabySaved(true)
     setTimeout(() => setBabySaved(false), 2000)
   }
@@ -267,6 +270,18 @@ export default function Settings({ onNotifSettingsChanged, onRestore }) {
               onChange={e => setBabyDob(e.target.value)}
             />
           </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-400 dark:text-gray-500">Sex</label>
+            <select
+              className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+              value={babySex}
+              onChange={e => setBabySex(e.target.value)}
+            >
+              <option value="">—</option>
+              <option value="boy">Boy</option>
+              <option value="girl">Girl</option>
+            </select>
+          </div>
         </div>
         <button
           onClick={saveBaby}
@@ -275,7 +290,7 @@ export default function Settings({ onNotifSettingsChanged, onRestore }) {
           {babySaved ? 'Saved ✓' : 'Save'}
         </button>
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          Used in the extraction prompt and the pediatrician report.
+          Used in the extraction prompt, the pediatrician report, and the WHO growth-chart overlay on the Weight trend.
         </p>
       </div>
 
