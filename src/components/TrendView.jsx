@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { lastOfType, todayCounts, dailySeries, relativeTime, weightSeries, pumpingScatter } from '../utils/aggregate'
+import { lastOfType, todayCounts, dailySeries, relativeTime, weightSeries } from '../utils/aggregate'
 import { eventToText } from '../utils/eventToText'
 import TimelineView from './TimelineView'
 import { WHO_WEIGHT_FOR_AGE_KG, MS_PER_WHO_MONTH } from '../utils/whoWeightForAge'
@@ -19,27 +19,23 @@ export default function TrendView({ events }) {
   const lastFeed = lastOfType(events, 'feed')
   const lastSleep = lastOfType(events, 'sleep')
   const lastDiaper = lastOfType(events, 'diaper')
-  const lastPumping = lastOfType(events, 'pumping')
   const series = dailySeries(events, days)
   const weights = weightSeries(events)
-  const pumps = pumpingScatter(events)
 
   return (
     <div className="flex flex-col gap-6">
       {/* Today at a glance */}
       <section>
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Today at a glance</h2>
-        <div className="grid grid-cols-4 gap-2">
+        <h2 className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-1.5">Today at a glance</h2>
+        <div className="grid grid-cols-3 gap-1.5">
           <StatCard label="Feeds" value={counts.feed} />
           <StatCard label="Sleeps" value={counts.sleep} />
           <StatCard label="Diapers" value={counts.diaper} />
-          <StatCard label="Pumping" value={counts.pumping} />
         </div>
-        <div className="mt-3 flex flex-col gap-1.5">
+        <div className="mt-2 flex flex-col gap-1">
           <LastLine label="Last feed" event={lastFeed} />
           <LastLine label="Last sleep" event={lastSleep} />
           <LastLine label="Last diaper" event={lastDiaper} />
-          {lastPumping && <LastLine label="Last pumping" event={lastPumping} />}
         </div>
       </section>
 
@@ -63,24 +59,9 @@ export default function TrendView({ events }) {
         </div>
         <FeedMilkBarRow title="Feed volume / day (by milk type)" series={series} />
         <BarRow title="Breast feeds (latches) / day" series={series} field="feedsBreast" color="bg-blue-500" unit="" />
-        <GroupedBarRow
-          title="Pumping / day"
-          series={series}
-          fieldA="pumpingsBreasts" labelA="breasts" colorA="bg-rose-400"
-          fieldB="pumpingsVolumeMl" labelB="ml" colorB="bg-rose-200 dark:bg-rose-800"
-          unitB="ml"
-        />
         <BarRow title="Total sleep (hrs)" series={series} field="sleepHours" color="bg-indigo-400" unit="h" />
         <StackedBarRow title="Diapers / day" series={series} />
       </section>
-
-      {/* Pumping: volume vs duration */}
-      {pumps.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Pumping: yield vs duration</h2>
-          <PumpScatter points={pumps} />
-        </section>
-      )}
 
       {/* Weight over time */}
       {weights.length > 0 && (
@@ -100,9 +81,9 @@ export default function TrendView({ events }) {
 
 function StatCard({ label, value }) {
   return (
-    <div className="rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-3 text-center shadow-sm">
-      <div className="text-2xl font-bold text-gray-800 dark:text-gray-100">{value}</div>
-      <div className="text-[11px] text-gray-400 dark:text-gray-500 leading-tight mt-0.5">{label}</div>
+    <div className="rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-2 text-center shadow-sm">
+      <div className="text-xl font-bold text-gray-800 dark:text-gray-100">{value}</div>
+      <div className="text-[10px] text-gray-400 dark:text-gray-500 leading-tight mt-0.5">{label}</div>
     </div>
   )
 }
@@ -170,77 +151,6 @@ function Gridlines() {
           style={{ top: `${pct}%` }}
         />
       ))}
-    </div>
-  )
-}
-
-// ─── GroupedBarRow ────────────────────────────────────────────────────────────
-// Two side-by-side bars per day: fieldA (e.g. count) and fieldB (e.g. total ml).
-// Each has its own scale so small counts and large ml values are both visible.
-function GroupedBarRow({ title, series, fieldA, labelA, colorA, fieldB, labelB, colorB, unitA = '', unitB = '' }) {
-  const [tooltip, setTooltip] = useState(null)
-  const maxA = Math.max(...series.map(d => d[fieldA]), 1)
-  const maxB = Math.max(...series.map(d => d[fieldB]), 1)
-  const step = labelStep(series.length)
-
-  return (
-    <div>
-      <div className="flex items-center gap-3 mb-1.5">
-        <span className="text-xs text-gray-400 dark:text-gray-500">{title}</span>
-        <span className="flex items-center gap-2 text-[10px] text-gray-400 dark:text-gray-500">
-          <span className="flex items-center gap-1">
-            <span className={`inline-block w-2 h-2 rounded-sm ${colorA}`} />{labelA}
-          </span>
-          <span className="flex items-center gap-1">
-            <span className={`inline-block w-2 h-2 rounded-sm ${colorB}`} />{labelB}
-          </span>
-        </span>
-      </div>
-      <div className="flex items-start gap-1">
-        <YAxis max={maxA} unit={unitA} />
-        <div className="flex-1 flex items-start gap-2">
-          {series.map((d, i) => {
-            const valA = d[fieldA]
-            const valB = d[fieldB]
-            const pxA = valA > 0 ? Math.max((valA / maxA) * TRACK_PX, 4) : 0
-            const pxB = valB > 0 ? Math.max((valB / maxB) * TRACK_PX, 4) : 0
-            const key = d.key
-            const showLabel = (series.length - 1 - i) % step === 0
-            return (
-              <div key={key} className="flex-1 flex flex-col items-center gap-1">
-                <div className="relative w-full flex items-end gap-0.5" style={{ height: TRACK_PX }}>
-                  <Gridlines />
-                  {/* Bar A */}
-                  <div
-                    className={`relative flex-1 rounded-t ${colorA} cursor-pointer hover:opacity-75 transition-opacity`}
-                    style={{ height: pxA }}
-                    onClick={() => setTooltip(tooltip === key + 'a' ? null : key + 'a')}
-                  >
-                    {tooltip === key + 'a' && (
-                      <div className="absolute -top-6 left-1/2 -translate-x-1/2 rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-1.5 py-0.5 whitespace-nowrap z-10 shadow">
-                        {valA}{unitA}
-                      </div>
-                    )}
-                  </div>
-                  {/* Bar B */}
-                  <div
-                    className={`relative flex-1 rounded-t ${colorB} cursor-pointer hover:opacity-75 transition-opacity`}
-                    style={{ height: pxB }}
-                    onClick={() => setTooltip(tooltip === key + 'b' ? null : key + 'b')}
-                  >
-                    {tooltip === key + 'b' && (
-                      <div className="absolute -top-6 left-1/2 -translate-x-1/2 rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-1.5 py-0.5 whitespace-nowrap z-10 shadow">
-                        {valB}{unitB}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="text-[10px] text-gray-500 dark:text-gray-400 h-3.5">{showLabel ? d.label : ''}</div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
     </div>
   )
 }
@@ -547,91 +457,3 @@ function WeightPlot({ weights }) {
   )
 }
 
-// ─── PumpScatter ──────────────────────────────────────────────────────────────
-// Scatter of pumping sessions: x = duration (min), y = volume (ml). Dot color
-// switches between time of day (morning vs night) and absolute time (recency,
-// to see supply trend over the logged period).
-function fracColor(f) {
-  return `hsl(${f * 300}, 70%, 50%)`
-}
-
-function PumpScatter({ points }) {
-  const [tip, setTip] = useState(null)
-  const [mode, setMode] = useState('tod') // 'tod' = time of day | 'date' = absolute time
-  const H = 160
-  const PAD = 8
-  const xMax = Math.max(...points.map(p => p.durationMin), 1)
-  const yMax = Math.max(...points.map(p => p.volumeMl), 1)
-  const xPct = d => Math.min(100, (d / xMax) * 100)
-  const yPx = v => (v / yMax) * (H - PAD * 2) + PAD
-
-  const yTicks = [yMax, yMax / 2, 0].map(v => Math.round(v))
-  const xTicks = [0, xMax / 2, xMax].map(v => Math.round(v))
-
-  const tsMin = Math.min(...points.map(p => p.ts))
-  const tsMax = Math.max(...points.map(p => p.ts))
-  const tsRange = tsMax - tsMin || 1
-  const colorFrac = p => (mode === 'tod' ? p.hour / 24 : (p.ts - tsMin) / tsRange)
-  const fmtDate = ms => new Date(ms).toLocaleDateString([], { month: 'short', day: 'numeric' })
-
-  return (
-    <div className="flex flex-col gap-2">
-      {/* Color mode switch */}
-      <div className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5 self-end">
-        {[['tod', 'Time of day'], ['date', 'Absolute time']].map(([m, label]) => (
-          <button
-            key={m}
-            onClick={() => setMode(m)}
-            className={`rounded-md px-3 py-1 text-xs font-medium transition ${
-              mode === m ? 'bg-white dark:bg-gray-900 text-violet-600 dark:text-violet-400 shadow-sm' : 'text-gray-500 dark:text-gray-400'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      <div className="flex items-start gap-1">
-        <div className="relative pr-1 shrink-0" style={{ height: H, width: Y_AXIS_W }}>
-          {yTicks.map((v, i) => (
-            <span key={i} className="absolute right-1 text-[9px] text-gray-500 dark:text-gray-400 -translate-y-1/2" style={{ top: `${TICK_PCTS[i]}%` }}>{v}ml</span>
-          ))}
-        </div>
-        <div className="flex-1">
-          <div className="relative w-full rounded-lg border border-gray-100 dark:border-gray-800" style={{ height: H }}>
-            {TICK_PCTS.map(p => (
-              <div key={p} className="absolute left-0 right-0 border-t border-gray-50 dark:border-gray-800/60" style={{ top: `${p}%` }} />
-            ))}
-            {points.map(p => (
-              <button
-                key={p.key}
-                onClick={() => setTip(tip === p.key ? null : p.key)}
-                className="absolute h-2.5 w-2.5 -translate-x-1/2 translate-y-1/2 rounded-full ring-1 ring-white/70 dark:ring-black/40 hover:scale-125 transition-transform"
-                style={{ left: `${xPct(p.durationMin)}%`, bottom: `${yPx(p.volumeMl)}px`, backgroundColor: fracColor(colorFrac(p)) }}
-              >
-                {tip === p.key && (
-                  <span className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] px-1.5 py-0.5 whitespace-nowrap z-10 shadow">
-                    {p.volumeMl}ml · {p.durationMin}min · {p.time} {p.date}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-          <div className="relative mt-1 h-3">
-            {xTicks.map((v, i) => (
-              <span key={i} className={`absolute text-[9px] text-gray-500 dark:text-gray-400 leading-none ${i === 0 ? '' : i === 2 ? '-translate-x-full' : '-translate-x-1/2'}`} style={{ left: `${[0, 50, 100][i]}%` }}>{v}min</span>
-            ))}
-          </div>
-        </div>
-      </div>
-      {/* Color legend */}
-      <div style={{ paddingLeft: Y_AXIS_W + 4 }}>
-        <div className="h-2 rounded-full" style={{ background: `linear-gradient(to right, ${fracColor(0)}, ${fracColor(0.25)}, ${fracColor(0.5)}, ${fracColor(0.75)}, ${fracColor(1)})` }} />
-        <div className="flex justify-between text-[9px] text-gray-400 dark:text-gray-500 mt-0.5">
-          {mode === 'tod'
-            ? <><span>00h</span><span>06h</span><span>12h</span><span>18h</span><span>24h</span></>
-            : <><span>{fmtDate(tsMin)}</span><span>{fmtDate(tsMin + tsRange / 2)}</span><span>{fmtDate(tsMax)}</span></>}
-        </div>
-      </div>
-    </div>
-  )
-}
