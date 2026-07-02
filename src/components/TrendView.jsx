@@ -414,7 +414,7 @@ function WeightPlot({ weights }) {
           <div className="relative w-full" style={{ height: WEIGHT_TRACK_PX }}>
             <Gridlines height={WEIGHT_TRACK_PX} />
             {framePoints.length >= 2 && (
-              <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 100 ${TRACK_PX}`} preserveAspectRatio="none">
+              <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 100 ${WEIGHT_TRACK_PX}`} preserveAspectRatio="none">
                 {WHO_BANDS.map(([loIdx, hiIdx]) => (
                   <polygon key={loIdx} points={bandPolygon(loIdx, hiIdx)} fill={WHO_BAND_COLOR} fillOpacity={WHO_BAND_OPACITY} />
                 ))}
