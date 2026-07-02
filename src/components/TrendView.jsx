@@ -13,12 +13,13 @@ export default function TrendView({ events }) {
     )
   }
 
+  const [days, setDays] = useState(14)
   const counts = todayCounts(events)
   const lastFeed = lastOfType(events, 'feed')
   const lastSleep = lastOfType(events, 'sleep')
   const lastDiaper = lastOfType(events, 'diaper')
   const lastPumping = lastOfType(events, 'pumping')
-  const series = dailySeries(events, 7)
+  const series = dailySeries(events, days)
   const weights = weightSeries(events)
   const pumps = pumpingScatter(events)
 
@@ -41,10 +42,26 @@ export default function TrendView({ events }) {
         </div>
       </section>
 
-      {/* 7-day bars */}
+      {/* Daily bars */}
       <section className="flex flex-col gap-5">
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Last 7 days</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Last {days} days</h2>
+          <div className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
+            {[7, 14, 30].map(d => (
+              <button
+                key={d}
+                onClick={() => setDays(d)}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                  days === d ? 'bg-white dark:bg-gray-900 text-violet-600 dark:text-violet-400 shadow-sm' : 'text-gray-500 dark:text-gray-400'
+                }`}
+              >
+                {d}d
+              </button>
+            ))}
+          </div>
+        </div>
         <FeedMilkBarRow title="Feed volume / day (by milk type)" series={series} />
+        <BarRow title="Breast feeds (latches) / day" series={series} field="feedsBreast" color="bg-blue-500" unit="" />
         <GroupedBarRow
           title="Pumping / day"
           series={series}
