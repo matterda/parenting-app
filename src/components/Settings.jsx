@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { getAllEvents, clearAllEvents, upsertEvent, addImportedEvents } from '../db'
+import { resetSyncCursor } from '../sync'
 import { parseEventsCsv, CSV_TEMPLATE } from '../utils/importCsv'
 import { getTheme, applyTheme } from '../theme'
 import { getNotifSettings, saveNotifSettings, requestPermission } from '../notifications'
@@ -78,6 +79,7 @@ export default function Settings({ onNotifSettingsChanged, onRestore }) {
 
   function saveSyncUrl() {
     localStorage.setItem(SYNC_KEY, syncUrl.trim())
+    resetSyncCursor() // different project (or none) — force a full pull next time
     setSyncSaved(true)
     setTimeout(() => setSyncSaved(false), 2000)
   }

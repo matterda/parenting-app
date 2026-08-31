@@ -104,13 +104,75 @@ export async function upsertEvent(ev) {
   }
   const merged = mergeEvent(existing, normEv)
   merged.id = normId
+  // Skip the write entirely when the merge is a no-op, to avoid rewriting
+  // every unchanged record to disk on every sync pull.
+  if (JSON.stringify(merged) === JSON.stringify(existing)) return existing
   await db.put(STORE, merged)
-  // Only log when the merge actually changed something, to avoid flooding the
-  // log with no-op sync writes.
-  if (JSON.stringify(merged) !== JSON.stringify(existing)) {
-    await appendLog({ op: 'update', id: normId, before: existing, after: merged, source: 'sync' })
-  }
+  await appendLog({ op: 'update', id: normId, before: existing, after: merged, source: 'sync' })
   return merged
+}
+
+// Bulk version of upsertEvent: merges a batch of remote events against local
+// state in a single IDB transaction instead of one get+put round trip per
+// event. This is what makes sync pull on app load fast as history grows.
+// Best-effort like appendLog: a batch failure must never block app load, so
+// on error we log and return whatever was written before the abort (the old
+// per-item loop tolerated a single bad record the same way).
+export async function upsertEvents(events) {
+  if (events.length === 0) return []
+  try {
+    const db = await getDB()
+    const tx = db.transaction([STORE, LOG_STORE], 'readwrite')
+    const store = tx.objectStore(STORE)
+    const log = tx.objectStore(LOG_STORE)
+    const saved = []
+    for (const ev of events) {
+      const normId = typeof ev.id === 'string' && /^\d+$/.test(ev.id) ? Number(ev.id) : ev.id
+      const normEv = normId !== ev.id ? { ...ev, id: normId } : ev
+      const existing = await store.get(normId)
+      if (!existing) {
+        await store.put(normEv)
+        await log.add({ ts: new Date().toISOString(), op: 'create', id: normId, before: null, after: normEv, source: 'sync' })
+        saved.push(normEv)
+        continue
+      }
+      const merged = mergeEvent(existing, normEv)
+      merged.id = normId
+      if (JSON.stringify(merged) === JSON.stringify(existing)) {
+        saved.push(existing)
+        continue
+      }
+      await store.put(merged)
+      await log.add({ ts: new Date().toISOString(), op: 'update', id: normId, before: existing, after: merged, source: 'sync' })
+      saved.push(merged)
+    }
+    await tx.done
+    return saved
+  } catch (err) {
+    console.warn('db.upsertEvents failed', err)
+    return []
+  }
+}
+
+// Bulk delete (e.g. applying remote tombstones) in a single transaction.
+// Best-effort — see upsertEvents.
+export async function deleteEvents(ids) {
+  if (ids.length === 0) return
+  try {
+    const db = await getDB()
+    const tx = db.transaction([STORE, LOG_STORE], 'readwrite')
+    const store = tx.objectStore(STORE)
+    const log = tx.objectStore(LOG_STORE)
+    for (const id of ids) {
+      const before = await store.get(id)
+      if (!before) continue
+      await store.delete(id)
+      await log.add({ ts: new Date().toISOString(), op: 'delete', id, before, after: null, source: 'user' })
+    }
+    await tx.done
+  } catch (err) {
+    console.warn('db.deleteEvents failed', err)
+  }
 }
 
 // Bulk-insert already-structured events (e.g. a one-time CSV import of

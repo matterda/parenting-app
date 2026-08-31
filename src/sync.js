@@ -4,10 +4,27 @@
 // Both devices push on every write and pull on open / visibilitychange.
 
 import { mergeEvent } from './utils/mergeEvent'
-import { setServerOffset } from './utils/serverTime'
+import { setServerOffset, serverNow } from './utils/serverTime'
 
 export function getSyncUrl() {
   return (localStorage.getItem('firebase_sync_url') ?? '').replace(/\/$/, '')
+}
+
+const LAST_PULL_KEY = 'last_pull_at'
+
+// A write can take a little while to land in Firebase after being timestamped
+// (slow network, brief offline queueing), so a device pulling right at that
+// moment could otherwise move its cursor past a write that hasn't arrived yet.
+// Re-requesting a trailing window on every pull means that write just gets
+// picked up (harmlessly, as a no-op re-merge) on the next pull instead of
+// being missed forever.
+const SYNC_SAFETY_MARGIN_MS = 5 * 60 * 1000
+
+// Forget the incremental-pull cursor, forcing the next syncPull to fetch full
+// history. Call this whenever the sync URL changes — a cursor from a
+// different Firebase project means nothing here.
+export function resetSyncCursor() {
+  localStorage.removeItem(LAST_PULL_KEY)
 }
 
 // Learn the offset between this device's clock and the Firebase server, so
@@ -84,7 +101,11 @@ export async function syncPush(events) {
   })
 }
 
-// Delete a single event from Firebase and record a tombstone
+// Delete a single event from Firebase and record a tombstone.
+// Stamped with serverNow(), not the device's raw clock — incremental pulls
+// filter tombstones by this value, so it has to share a clock basis with
+// updated_at and the pull cursor, or a skewed device's deletes could fall
+// outside another device's "since" window and never sync.
 export async function syncDelete(id) {
   const base = getSyncUrl()
   if (!base) return
@@ -93,25 +114,43 @@ export async function syncDelete(id) {
     fetch(`${base}/tombstones/${id}.json`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(new Date().toISOString()),
+      body: JSON.stringify(serverNow()),
     }),
   ])
 }
 
-// Pull all remote events + tombstones.
+// Pull remote events + tombstones changed since the last successful pull
+// (falling back to full history the first time, or after resetSyncCursor).
+// Ordering/filtering by `updated_at` — not `timestamp_start` — is what makes
+// an edit to an old entry (e.g. yesterday's feed corrected today) show up:
+// editing always bumps updated_at, regardless of how old the entry itself is.
 // Returns { events: Event[], tombstoneIds: string[] }
 export async function syncPull() {
   const base = getSyncUrl()
   if (!base) return { events: [], tombstoneIds: [] }
+  const since = localStorage.getItem(LAST_PULL_KEY)
+  const pullStartedAt = serverNow()
   try {
+    const range = since
+      ? `?${new URLSearchParams({ orderBy: '"updated_at"', startAt: JSON.stringify(since) })}`
+      : ''
+    // Tombstones are plain ISO-string values (not objects), so order by the
+    // value itself rather than a field.
+    const tombstoneRange = since
+      ? `?${new URLSearchParams({ orderBy: '"$value"', startAt: JSON.stringify(since) })}`
+      : ''
     const [evRes, tbRes] = await Promise.all([
-      fetch(`${base}/events.json`),
-      fetch(`${base}/tombstones.json`),
+      fetch(`${base}/events.json${range}`),
+      fetch(`${base}/tombstones.json${tombstoneRange}`),
     ])
     const evData = evRes.ok ? await evRes.json() : null
     const tbData = tbRes.ok ? await tbRes.json() : null
     // IDB auto-increment keys are numbers; Firebase JSON keys are strings — coerce back.
     const coerceId = id => (isNaN(Number(id)) ? id : Number(id))
+    if (evRes.ok && tbRes.ok) {
+      const cursor = new Date(new Date(pullStartedAt).getTime() - SYNC_SAFETY_MARGIN_MS).toISOString()
+      localStorage.setItem(LAST_PULL_KEY, cursor)
+    }
     return {
       events: evData ? Object.values(evData) : [],
       tombstoneIds: tbData ? Object.keys(tbData).map(coerceId) : [],

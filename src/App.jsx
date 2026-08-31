@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { addRawEvent, replaceWithExtracted, getAllEvents, deleteEvent, updateEvent, upsertEvent, addImportedEvents } from './db'
+import { addRawEvent, replaceWithExtracted, getAllEvents, deleteEvent, deleteEvents, updateEvent, upsertEvents, addImportedEvents } from './db'
 import { extractEvents } from './api'
 import { toLocalISO } from './utils/time'
 import { scheduleCheck } from './notifications'
@@ -53,8 +53,8 @@ export default function App() {
     async function init() {
       await syncServerTime()
       const { events: remoteEvs, tombstoneIds } = await syncPull()
-      for (const ev of remoteEvs) await upsertEvent(ev)
-      for (const id of tombstoneIds) await deleteEvent(id).catch(() => {})
+      await upsertEvents(remoteEvs)
+      await deleteEvents(tombstoneIds)
       const evs = await getAllEvents()
       setEvents(evs)
       scheduleCheck(evs)
@@ -71,8 +71,8 @@ export default function App() {
       await syncServerTime()
       const { events: remoteEvs, tombstoneIds } = await syncPull()
       let changed = tombstoneIds.length > 0 || remoteEvs.length > 0
-      for (const ev of remoteEvs) await upsertEvent(ev)
-      for (const id of tombstoneIds) await deleteEvent(id).catch(() => {})
+      await upsertEvents(remoteEvs)
+      await deleteEvents(tombstoneIds)
       if (changed) {
         await refreshEvents()
       } else {
