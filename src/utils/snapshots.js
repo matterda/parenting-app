@@ -4,7 +4,11 @@
 // Firebase wipes, bulk deletes, or app bugs.
 
 const KEY = 'baby_log_snapshots'
-const MAX_SNAPSHOTS = 10
+// Each entry is a FULL uncompressed copy of the events array (unlike the
+// gzip'd daily snapshots below), so this is kept small — it's a quick "undo
+// the last few saves" net, not long-term backup. Long-term recovery is what
+// the daily snapshots and the IndexedDB event log are for.
+const MAX_SNAPSHOTS = 3
 
 function load() {
   try {

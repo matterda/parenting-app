@@ -83,8 +83,12 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [events])
 
-  // Remember the current tab across refreshes / app restarts.
-  useEffect(() => { localStorage.setItem('active_tab', tab) }, [tab])
+  // Remember the current tab across refreshes / app restarts. Best-effort:
+  // a full localStorage (e.g. baby_log_snapshots eating the quota) must not
+  // crash navigation over something this inconsequential.
+  useEffect(() => {
+    try { localStorage.setItem('active_tab', tab) } catch { /* ignore quota */ }
+  }, [tab])
 
   const activeSleep = getActiveSleep(events)
 
