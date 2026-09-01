@@ -147,15 +147,28 @@ export async function syncPull() {
     const tbData = tbRes.ok ? await tbRes.json() : null
     // IDB auto-increment keys are numbers; Firebase JSON keys are strings — coerce back.
     const coerceId = id => (isNaN(Number(id)) ? id : Number(id))
-    if (evRes.ok && tbRes.ok) {
-      const cursor = new Date(new Date(pullStartedAt).getTime() - SYNC_SAFETY_MARGIN_MS).toISOString()
-      localStorage.setItem(LAST_PULL_KEY, cursor)
-    }
     return {
       events: evData ? Object.values(evData) : [],
       tombstoneIds: tbData ? Object.keys(tbData).map(coerceId) : [],
+      // Only handed back when both fetches succeeded; caller commits it with
+      // commitPullCursor() AFTER the batch is durably applied to IDB — not
+      // here. Advancing the cursor before that would mean a crash or a
+      // localStorage write failure between "fetched" and "applied" loses the
+      // batch forever, since the next pull would start after it.
+      cursor: evRes.ok && tbRes.ok
+        ? new Date(new Date(pullStartedAt).getTime() - SYNC_SAFETY_MARGIN_MS).toISOString()
+        : null,
     }
   } catch {
     return { events: [], tombstoneIds: [] }
   }
+}
+
+// Persist the pull cursor. Call only after the pulled batch has been applied
+// to IDB. Best-effort: a full localStorage must not lose the batch we just
+// applied — losing only the cursor just means the next pull re-fetches a
+// wider (still-correct, idempotent) range.
+export function commitPullCursor(cursor) {
+  if (!cursor) return
+  try { localStorage.setItem(LAST_PULL_KEY, cursor) } catch { /* ignore quota */ }
 }

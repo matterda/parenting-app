@@ -3,7 +3,7 @@ import { addRawEvent, replaceWithExtracted, getAllEvents, deleteEvent, deleteEve
 import { extractEvents } from './api'
 import { toLocalISO } from './utils/time'
 import { scheduleCheck } from './notifications'
-import { syncPull, syncPush, syncDelete, syncServerTime } from './sync'
+import { syncPull, syncPush, syncDelete, syncServerTime, commitPullCursor } from './sync'
 import { saveSnapshot, saveDailySnapshot } from './utils/snapshots'
 import { lastOfType } from './utils/aggregate'
 import LogInput from './components/LogInput'
@@ -52,9 +52,14 @@ export default function App() {
   useEffect(() => {
     async function init() {
       await syncServerTime()
-      const { events: remoteEvs, tombstoneIds } = await syncPull()
-      await upsertEvents(remoteEvs)
+      const { events: remoteEvs, tombstoneIds, cursor } = await syncPull()
+      const saved = await upsertEvents(remoteEvs)
       await deleteEvents(tombstoneIds)
+      // Only advance the cursor if the whole batch actually made it to IDB —
+      // upsertEvents swallows its own errors and returns a short/empty array
+      // on failure, and advancing past a batch that was never applied would
+      // permanently lose it (same bug class as the localStorage case above).
+      if (saved.length === remoteEvs.length) commitPullCursor(cursor)
       const evs = await getAllEvents()
       setEvents(evs)
       scheduleCheck(evs)
@@ -69,10 +74,11 @@ export default function App() {
     async function onVisible() {
       if (document.visibilityState !== 'visible') return
       await syncServerTime()
-      const { events: remoteEvs, tombstoneIds } = await syncPull()
+      const { events: remoteEvs, tombstoneIds, cursor } = await syncPull()
       let changed = tombstoneIds.length > 0 || remoteEvs.length > 0
-      await upsertEvents(remoteEvs)
+      const saved = await upsertEvents(remoteEvs)
       await deleteEvents(tombstoneIds)
+      if (saved.length === remoteEvs.length) commitPullCursor(cursor)
       if (changed) {
         await refreshEvents()
       } else {
