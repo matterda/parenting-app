@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { lastOfType, todayCounts, dailySeries, relativeTime, weightSeries } from '../utils/aggregate'
 import { eventToText } from '../utils/eventToText'
 import TimelineView from './TimelineView'
-import { WHO_WEIGHT_FOR_AGE_KG, MS_PER_WHO_MONTH } from '../utils/whoWeightForAge'
+import { WHO_WEIGHT_FOR_AGE_KG, WHO_PERCENTILES, MS_PER_WHO_MONTH } from '../utils/whoWeightForAge'
 
 export default function TrendView({ events }) {
   const [days, setDays] = useState(14)
@@ -331,27 +331,141 @@ function FeedMilkBarRow({ title, series }) {
 // Scatter plot on a real time axis: dots sit at their actual measurement date,
 // so gaps between weigh-ins are visible (unlike evenly-spaced bars).
 //
-// WHO overlay: 3 nested translucent bands (3rd–97th, 15th–85th, 25th–75th
-// percentile) are drawn behind the dots, one WHO month per polygon vertex.
-// Same color/opacity for all three — where they overlap the alpha naturally
-// compounds into a darker-toward-median gradient, no gradient math needed.
-const WHO_BAND_COLOR = '#22c55e'
-const WHO_BAND_OPACITY = 0.12
-const WHO_BANDS = [[0, 6], [1, 5], [2, 4]] // indices into WHO_PERCENTILES: [p3,p97] [p15,p85] [p25,p75]
+// Zoom is horizontal-only: pinch (2 fingers) or ctrl/⌘+wheel changes how wide
+// the plot's own scroll content is, and panning is just native horizontal
+// scroll over that wider content — no custom pan gesture code needed. The
+// y-axis re-fits to whichever weigh-ins are actually scrolled into view.
+//
+// WHO overlay: the 7 official percentile curves (p3…p97) drawn as lines, like
+// a printed growth chart — median (p50) bold, the rest lighter/dashed.
+const WHO_LINE_COLOR = '#16a34a'
+// One style per WHO_PERCENTILES entry: [p3, p15, p25, p50, p75, p85, p97].
+const WHO_LINE_STYLE = [
+  { width: 1,    opacity: 0.35, dash: '3,3' },
+  { width: 1,    opacity: 0.4,  dash: '3,3' },
+  { width: 1,    opacity: 0.5,  dash: '3,3' },
+  { width: 1.75, opacity: 0.8,  dash: null },
+  { width: 1,    opacity: 0.5,  dash: '3,3' },
+  { width: 1,    opacity: 0.4,  dash: '3,3' },
+  { width: 1,    opacity: 0.35, dash: '3,3' },
+]
 // Weight gets its own (taller) track height, independent of the bar charts'
-// shared TRACK_PX — makes it easier to see where each point sits in the WHO bands.
+// shared TRACK_PX — makes it easier to see where each point sits vs. the WHO lines.
 const WEIGHT_TRACK_PX = 160
+const MIN_ZOOM = 1
+const MAX_ZOOM = 20 // ~5% of the full time span at max zoom
 
 function WeightPlot({ weights }) {
   const [tooltip, setTooltip] = useState(null)
-  // Scale by kg-normalised values so 3000g and 3kg plot at the same height.
-  const kgValues = weights.map(w => w.valueKg)
+  const [zoomLevel, setZoomLevel] = useState(1)
+  const [viewportWidth, setViewportWidth] = useState(0)
+  const [scrollLeft, setScrollLeft] = useState(0)
+  const scrollRef = useRef(null)
+  const pointersRef = useRef(new Map())
+  const pinchRef = useRef(null)
+  const pendingCenterRef = useRef(null)
 
+  const single = weights.length === 1
+
+  // Reset zoom when the set of weigh-ins changes (e.g. a new one logged), so
+  // a fresh point can't end up hidden outside a stale zoomed-in window.
+  const weightsKey = weights.map(w => w.key).join(',')
+  const [prevWeightsKey, setPrevWeightsKey] = useState(weightsKey)
+  if (weightsKey !== prevWeightsKey) {
+    setPrevWeightsKey(weightsKey)
+    setZoomLevel(1)
+  }
+
+  // Measure the scroll container in real pixels — a percent-based SVG viewBox
+  // stretched non-uniformly would render WHO line strokes thicker on steep
+  // segments than flat ones.
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => setViewportWidth(entry.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // Keep the visible center fixed across a zoom change instead of always
+  // zooming from the left edge.
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el || pendingCenterRef.current == null) return
+    const contentWidth = el.clientWidth * zoomLevel
+    el.scrollLeft = pendingCenterRef.current * contentWidth - el.clientWidth / 2
+    pendingCenterRef.current = null
+  }, [zoomLevel])
+
+  function applyZoom(nextRaw) {
+    const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextRaw))
+    const el = scrollRef.current
+    if (el) {
+      const contentWidth = el.clientWidth * zoomLevel
+      pendingCenterRef.current = contentWidth > 0 ? (el.scrollLeft + el.clientWidth / 2) / contentWidth : 0.5
+    }
+    setZoomLevel(next)
+  }
+
+  function onPointerDown(e) {
+    pointersRef.current.set(e.pointerId, e.clientX)
+    e.currentTarget.setPointerCapture(e.pointerId)
+    if (pointersRef.current.size === 2) {
+      const [x1, x2] = [...pointersRef.current.values()]
+      pinchRef.current = { startDist: Math.abs(x1 - x2) || 1, startZoom: zoomLevel }
+    }
+  }
+  function onPointerMove(e) {
+    if (!pointersRef.current.has(e.pointerId)) return
+    pointersRef.current.set(e.pointerId, e.clientX)
+    if (pointersRef.current.size === 2 && pinchRef.current) {
+      e.preventDefault()
+      const [x1, x2] = [...pointersRef.current.values()]
+      applyZoom(pinchRef.current.startZoom * (Math.abs(x1 - x2) / pinchRef.current.startDist))
+    }
+  }
+  function onPointerUp(e) {
+    pointersRef.current.delete(e.pointerId)
+    if (pointersRef.current.size < 2) pinchRef.current = null
+  }
+
+  // ctrl/⌘+wheel is trackpad-pinch (or an explicit zoom scroll); plain wheel
+  // is left alone so the page keeps scrolling normally over the chart.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || single) return
+    function onWheel(e) {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      applyZoom(zoomLevel * Math.exp(-e.deltaY * 0.01))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [zoomLevel, single])
+
+  // Scale by kg-normalised values so 3000g and 3kg plot at the same height.
   const tValues = weights.map(w => w.ts)
   const tMin = Math.min(...tValues)
   const tMax = Math.max(...tValues)
   const tRange = tMax - tMin || 1
-  const single = weights.length === 1
+
+  const contentWidth = single ? viewportWidth : viewportWidth * zoomLevel
+  const xPct = ts => (single ? 50 : ((ts - tMin) / tRange) * 100)
+  const xPx  = ts => (xPct(ts) / 100) * contentWidth
+
+  // Weigh-ins actually scrolled into view — the y-axis fits to these, not the
+  // full history, so zooming/panning re-scales the axis to what's on screen.
+  const visibleTMin = single || !contentWidth ? tMin : tMin + (scrollLeft / contentWidth) * tRange
+  const visibleTMax = single || !contentWidth ? tMax : tMin + ((scrollLeft + viewportWidth) / contentWidth) * tRange
+  const inView = weights.filter(w => w.ts >= visibleTMin && w.ts <= visibleTMax)
+  const yWeights = inView.length > 0 ? inView : weights
+
+  const kgValues = yWeights.map(w => w.valueKg)
+  const min = Math.min(...kgValues)
+  const max = Math.max(...kgValues)
+  const range = max - min || 1
+
+  const yPx = kg => Math.max(((kg - min) / range) * (WEIGHT_TRACK_PX - 16) + 8, 6)
 
   const babyDob = localStorage.getItem('baby_dob')
   const babySex = localStorage.getItem('baby_sex')
@@ -359,8 +473,9 @@ function WeightPlot({ weights }) {
   const canOverlay = !single && dobMs && (babySex === 'boy' || babySex === 'girl')
 
   // WHO monthly age points (0–24mo from DOB) padded one month past each edge
-  // of the visible time window, so band edges reach past the frame instead of
-  // stopping mid-chart. Points outside [0,100]% are clipped by the SVG itself.
+  // of the full data range, so line ends reach past the frame instead of
+  // stopping mid-chart. Computed over the full range, not the zoomed view —
+  // panning/zooming shouldn't make the reference lines pop in and out.
   let framePoints = []
   if (canOverlay) {
     const allMonths = Array.from({ length: 25 }, (_, m) => ({ month: m, ts: dobMs + m * MS_PER_WHO_MONTH }))
@@ -373,30 +488,27 @@ function WeightPlot({ weights }) {
   }
   const bandRows = framePoints.map(p => WHO_WEIGHT_FOR_AGE_KG[babySex][p.month])
 
-  const min = Math.min(...kgValues, ...bandRows.map(r => r[0]))
-  const max = Math.max(...kgValues, ...bandRows.map(r => r[r.length - 1]))
-  const range = max - min || 1
-
-  const xPct = ts => (single ? 50 : ((ts - tMin) / tRange) * 100)
-  const yPx  = kg => Math.max(((kg - min) / range) * (WEIGHT_TRACK_PX - 16) + 8, 6)
-
-  const bandPolygon = (loIdx, hiIdx) => {
-    const top = framePoints.map((p, i) => `${xPct(p.ts)},${WEIGHT_TRACK_PX - yPx(bandRows[i][hiIdx])}`)
-    const bottom = framePoints.map((p, i) => `${xPct(p.ts)},${WEIGHT_TRACK_PX - yPx(bandRows[i][loIdx])}`).reverse()
-    return [...top, ...bottom].join(' ')
-  }
-
   const fmt = ms => new Date(ms).toLocaleDateString([], { month: 'short', day: 'numeric' })
   const xTicks = single
     ? [{ pct: 50, label: fmt(tMin) }]
     : [
-        { pct: 0,   label: fmt(tMin) },
-        { pct: 50,  label: fmt(tMin + tRange / 2) },
-        { pct: 100, label: fmt(tMax) },
+        { pct: 0,   label: fmt(visibleTMin) },
+        { pct: 50,  label: fmt((visibleTMin + visibleTMax) / 2) },
+        { pct: 100, label: fmt(visibleTMax) },
       ]
 
   return (
     <div className="flex flex-col gap-1">
+      {!single && (
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] text-gray-400 dark:text-gray-500">Pinch or ctrl+scroll to zoom</span>
+          {zoomLevel > 1 && (
+            <button onClick={() => setZoomLevel(1)} className="text-[11px] font-medium text-violet-600 dark:text-violet-400">
+              Reset zoom
+            </button>
+          )}
+        </div>
+      )}
       <div className="flex items-start gap-1">
         <div className="relative pr-1 shrink-0" style={{ height: WEIGHT_TRACK_PX, width: Y_AXIS_W }}>
           {[max, (max + min) / 2, min].map((v, i) => (
@@ -409,14 +521,31 @@ function WeightPlot({ weights }) {
             </span>
           ))}
         </div>
-        <div className="flex-1">
-          {/* Plot area */}
-          <div className="relative w-full" style={{ height: WEIGHT_TRACK_PX }}>
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-x-auto overflow-y-hidden"
+          style={{ touchAction: 'manipulation' }}
+          onScroll={e => setScrollLeft(e.currentTarget.scrollLeft)}
+          onPointerDown={single ? undefined : onPointerDown}
+          onPointerMove={single ? undefined : onPointerMove}
+          onPointerUp={single ? undefined : onPointerUp}
+          onPointerCancel={single ? undefined : onPointerUp}
+        >
+          {/* Plot area — width grows with zoom; the div's own native scroll pans it */}
+          <div className="relative" style={{ height: WEIGHT_TRACK_PX, width: single ? '100%' : contentWidth || '100%' }}>
             <Gridlines height={WEIGHT_TRACK_PX} />
-            {framePoints.length >= 2 && (
-              <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 100 ${WEIGHT_TRACK_PX}`} preserveAspectRatio="none">
-                {WHO_BANDS.map(([loIdx, hiIdx]) => (
-                  <polygon key={loIdx} points={bandPolygon(loIdx, hiIdx)} fill={WHO_BAND_COLOR} fillOpacity={WHO_BAND_OPACITY} />
+            {framePoints.length >= 2 && contentWidth > 0 && (
+              <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${contentWidth} ${WEIGHT_TRACK_PX}`} preserveAspectRatio="none">
+                {WHO_PERCENTILES.map((p, idx) => (
+                  <polyline
+                    key={p}
+                    points={framePoints.map((fp, i) => `${xPx(fp.ts)},${WEIGHT_TRACK_PX - yPx(bandRows[i][idx])}`).join(' ')}
+                    fill="none"
+                    stroke={WHO_LINE_COLOR}
+                    strokeWidth={WHO_LINE_STYLE[idx].width}
+                    strokeOpacity={WHO_LINE_STYLE[idx].opacity}
+                    strokeDasharray={WHO_LINE_STYLE[idx].dash ?? undefined}
+                  />
                 ))}
               </svg>
             )}
@@ -435,21 +564,21 @@ function WeightPlot({ weights }) {
               </button>
             ))}
           </div>
-          {/* X axis (time) */}
-          <div className="relative mt-1 h-3">
-            {xTicks.map((t, i) => (
-              <span
-                key={i}
-                className={`absolute text-[9px] text-gray-500 dark:text-gray-400 leading-none ${
-                  t.pct === 0 ? '' : t.pct === 100 ? '-translate-x-full' : '-translate-x-1/2'
-                }`}
-                style={{ left: `${t.pct}%` }}
-              >
-                {t.label}
-              </span>
-            ))}
-          </div>
         </div>
+      </div>
+      {/* X axis (time) — reflects whatever's currently scrolled/zoomed into view */}
+      <div className="relative mt-1 h-3" style={{ marginLeft: Y_AXIS_W + 4 }}>
+        {xTicks.map((t, i) => (
+          <span
+            key={i}
+            className={`absolute text-[9px] text-gray-500 dark:text-gray-400 leading-none ${
+              t.pct === 0 ? '' : t.pct === 100 ? '-translate-x-full' : '-translate-x-1/2'
+            }`}
+            style={{ left: `${t.pct}%` }}
+          >
+            {t.label}
+          </span>
+        ))}
       </div>
       {!canOverlay && !single && (
         <p className="text-[11px] text-gray-400 dark:text-gray-500">
