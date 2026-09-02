@@ -1,5 +1,5 @@
 import { openDB } from 'idb'
-import { mergeEvent } from './utils/mergeEvent'
+import { mergeEvent, sameEvent } from './utils/mergeEvent'
 import { serverNow } from './utils/serverTime'
 import { appendLog } from './utils/eventLog'
 
@@ -106,7 +106,7 @@ export async function upsertEvent(ev) {
   merged.id = normId
   // Skip the write entirely when the merge is a no-op, to avoid rewriting
   // every unchanged record to disk on every sync pull.
-  if (JSON.stringify(merged) === JSON.stringify(existing)) return existing
+  if (sameEvent(merged, existing)) return existing
   await db.put(STORE, merged)
   await appendLog({ op: 'update', id: normId, before: existing, after: merged, source: 'sync' })
   return merged
@@ -138,7 +138,7 @@ export async function upsertEvents(events) {
       }
       const merged = mergeEvent(existing, normEv)
       merged.id = normId
-      if (JSON.stringify(merged) === JSON.stringify(existing)) {
+      if (sameEvent(merged, existing)) {
         saved.push(existing)
         continue
       }

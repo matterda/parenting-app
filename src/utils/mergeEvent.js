@@ -14,6 +14,22 @@
 //  - The merge is deterministic and idempotent, so every device converges on
 //    the same result regardless of arg order or how many times it runs.
 
+// Key-order-insensitive deep equality, used to decide "did this merge actually
+// change anything?". Plain JSON.stringify comparison is order-sensitive, and
+// local records (db.js field order) vs remote ones (RTDB returns keys sorted)
+// don't agree on order — so a no-op merge could read as a change. On the push
+// path that mattered: a bogus "changed" restamps the event's server arrival
+// time, the other phone pulls it, re-pushes, and the two ping-pong forever.
+export function sameEvent(a, b) {
+  return JSON.stringify(canon(a)) === JSON.stringify(canon(b))
+}
+
+function canon(v) {
+  if (Array.isArray(v)) return v.map(canon)
+  if (isPlainObject(v)) return Object.fromEntries(Object.keys(v).sort().map(k => [k, canon(v[k])]))
+  return v
+}
+
 export function mergeEvent(a, b) {
   if (!a) return b
   if (!b) return a
