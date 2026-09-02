@@ -94,11 +94,13 @@ export async function syncPush(events) {
   }
   if (Object.keys(updates).length === 0) return
 
-  await fetch(`${base}/events.json`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
-  })
+  try {
+    await fetch(`${base}/events.json`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    })
+  } catch { /* offline or backgrounded mid-request — retried on next app open */ }
 }
 
 // Delete a single event from Firebase and record a tombstone.

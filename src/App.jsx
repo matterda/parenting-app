@@ -65,6 +65,11 @@ export default function App() {
       scheduleCheck(evs)
       saveSnapshot(evs)
       saveDailySnapshot(evs)
+      // Retry any local write whose push never reached Firebase (e.g. the app
+      // was backgrounded mid-request right after logging) — push is otherwise
+      // only triggered by a local write, so a device that just opens the app
+      // would never get another chance to resend it.
+      syncPush(evs)
     }
     init()
   }, [])
@@ -83,6 +88,8 @@ export default function App() {
         await refreshEvents()
       } else {
         scheduleCheck(events)
+        // Retry any local write whose push never landed (see init()'s comment).
+        syncPush(events)
       }
     }
     document.addEventListener('visibilitychange', onVisible)
